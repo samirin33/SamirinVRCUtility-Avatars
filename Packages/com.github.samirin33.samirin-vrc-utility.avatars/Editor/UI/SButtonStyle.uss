@@ -1,0 +1,36 @@
+.SamirinButtonBody {
+    transition-duration: 0.1s;
+    transition-timing-function: ease-out;
+    translate: 0 0;
+}
+
+.SamirinButton:hover .SamirinButtonBody {
+    translate: 0 -2px;
+}
+
+.SamirinButton:active .SamirinButtonBody {
+    translate: 0 1px;
+}
+
+.SamirinStyleShadow {
+    transition-duration: 0.1s;
+    transition-timing-function: ease-out;
+    translate: 0 1px;
+}
+
+.SamirinButton:hover .SamirinStyleShadow {
+    translate: 0 2px;
+}
+
+.SamirinButton:active .SamirinStyleShadow {
+    translate: 0 1px;
+}
+
+.SamirinButton {
+}
+
+.SamirinButton:hover {
+}
+
+.SamirinButton:active {
+}

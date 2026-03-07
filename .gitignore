@@ -10,8 +10,12 @@
 /[Ll]ogs/
 /[Mm]emoryCaptures/
 
-# Asset meta data should only be ignored when the corresponding asset is also ignored
-!/[Aa]ssets/**/*.meta
+# Assets フォルダ全体を無視（VPM パッケージのみリポジトリに含める）
+/[Aa]ssets/
+
+# プロジェクト設定を無視（Unity のバージョン・環境依存のため）
+/[Pp]roject[Ss]ettings/
+/[Uu]ser[Ss]ettings/
 
 # Uncomment this line if you wish to ignore the asset store tools plugin
 # /[Aa]ssets/AssetStoreTools*

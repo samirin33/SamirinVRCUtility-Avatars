@@ -1,1 +1,63 @@
-{"dependencies": {}, "locked": {}}
+{
+  "dependencies": {
+    "com.vrchat.avatars": {
+      "version": "3.10.2"
+    },
+    "nadena.dev.ndmf": {
+      "version": "1.11.0"
+    },
+    "nadena.dev.modular-avatar": {
+      "version": "1.16.2"
+    },
+    "nadena.dev.misc-vrc-tools": {
+      "version": "0.0.8"
+    },
+    "jp.lilxyzw.liltoon": {
+      "version": "2.3.2"
+    },
+    "jp.lilxyzw.avatar-utils": {
+      "version": "2.1.2"
+    },
+    "com.llealloo.audiolink": {
+      "version": "3.1.2"
+    }
+  },
+  "locked": {
+    "com.vrchat.base": {
+      "version": "3.10.2",
+      "dependencies": {}
+    },
+    "jp.lilxyzw.avatar-utils": {
+      "version": "2.1.2",
+      "dependencies": {}
+    },
+    "nadena.dev.ndmf": {
+      "version": "1.11.0",
+      "dependencies": {}
+    },
+    "nadena.dev.modular-avatar": {
+      "version": "1.16.2",
+      "dependencies": {
+        "nadena.dev.ndmf": ">=1.11.0 <2.0.0-a"
+      }
+    },
+    "com.vrchat.avatars": {
+      "version": "3.10.2",
+      "dependencies": {
+        "com.vrchat.base": "3.10.2"
+      }
+    },
+    "jp.lilxyzw.liltoon": {
+      "version": "2.3.2",
+      "dependencies": {}
+    },
+    "nadena.dev.misc-vrc-tools": {
+      "version": "0.0.8",
+      "dependencies": {}
+    },
+    "com.llealloo.audiolink": {
+      "version": "3.1.2",
+      "dependencies": {}
+    }
+  }
+}
