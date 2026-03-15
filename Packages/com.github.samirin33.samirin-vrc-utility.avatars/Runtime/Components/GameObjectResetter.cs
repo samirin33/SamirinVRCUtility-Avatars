@@ -1,5 +1,4 @@
 using UnityEngine;
-using nadena.dev.ndmf;
 using Samirin33.NDMF.Base;
 
 namespace Samirin33.NDMF.Components
@@ -21,16 +20,16 @@ namespace Samirin33.NDMF.Components
 
         public bool destroyOnReset = false;
 
-        public override void OnBuild(BuildPhase buildPhase, bool beforeModularAvatar, GameObject avatarRootObject)
+        public override void OnBuild(SamirinBuildPhase buildPhase, bool beforeModularAvatar, GameObject avatarRootObject)
         {
-            if (buildPhase == BuildPhase.Transforming && !beforeModularAvatar)
+            if (buildPhase == SamirinBuildPhase.Transforming && !beforeModularAvatar)
             {
                 if (objectEnable)
                 {
                     gameObject.SetActive(resetObjectEnable);
                 }
             }
-            else if (buildPhase == BuildPhase.Resolving && beforeModularAvatar)
+            else if (buildPhase == SamirinBuildPhase.Resolving && beforeModularAvatar)
             {
                 OnBuildResolvingBeforeMA(avatarRootObject);
             }

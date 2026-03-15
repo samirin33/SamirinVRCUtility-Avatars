@@ -83,6 +83,15 @@ namespace Samirin33.NDMF.Base.Plugin
             });
         }
 
+        private static SamirinBuildPhase ToSamirinBuildPhase(BuildPhase phase)
+        {
+            if (phase == BuildPhase.Resolving) return SamirinBuildPhase.Resolving;
+            if (phase == BuildPhase.Generating) return SamirinBuildPhase.Generating;
+            if (phase == BuildPhase.Transforming) return SamirinBuildPhase.Transforming;
+            if (phase == BuildPhase.Optimizing) return SamirinBuildPhase.Optimizing;
+            throw new ArgumentOutOfRangeException(nameof(phase), phase?.Name, "Unsupported BuildPhase for SamirinBuildPhase.");
+        }
+
         private static void InvokeOnBuild(SamirinMABase[] scripts, BuildPhase buildPhase, bool beforeModularAvatar, GameObject avatarRootObject)
         {
             var processedSingleTypes = new HashSet<Type>();
@@ -128,13 +137,13 @@ namespace Samirin33.NDMF.Base.Plugin
                         SamirinMABaseSingleBuildRegistry.Invoke(scriptType, root, s);
                     Action<GameObject, SamirinMABaseSingle[]> invokeReplaceBuilder = (root, s) =>
                         SamirinMABaseSingleBuildRegistry.InvokeReplace(scriptType, root, s);
-                    array[0].OnBuildSingle(buildPhase, beforeModularAvatar, array, avatarRoot, invokeBuilder, invokeReplaceBuilder);
+                    array[0].OnBuildSingle(ToSamirinBuildPhase(buildPhase), beforeModularAvatar, array, avatarRoot, invokeBuilder, invokeReplaceBuilder);
                 }
                 else
                 {
                     var script = (SamirinMABase)payload;
                     processedOnBuildIds.Add(script.GetInstanceID());
-                    script.OnBuild(buildPhase, beforeModularAvatar, avatarRootObject);
+                    script.OnBuild(ToSamirinBuildPhase(buildPhase), beforeModularAvatar, avatarRootObject);
                 }
             }
         }

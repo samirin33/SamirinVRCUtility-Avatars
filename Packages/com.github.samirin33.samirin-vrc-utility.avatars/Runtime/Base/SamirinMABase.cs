@@ -1,6 +1,5 @@
 using UnityEngine;
 using VRC.SDKBase;
-using nadena.dev.ndmf;
 
 namespace Samirin33.NDMF.Base
 {
@@ -8,6 +7,6 @@ namespace Samirin33.NDMF.Base
     {
         [System.NonSerialized]
         public int priority = 100;
-        public virtual void OnBuild(BuildPhase buildPhase, bool beforeModularAvatar, GameObject avatarRootObject) { }
+        public virtual void OnBuild(SamirinBuildPhase buildPhase, bool beforeModularAvatar, GameObject avatarRootObject) { }
     }
 }

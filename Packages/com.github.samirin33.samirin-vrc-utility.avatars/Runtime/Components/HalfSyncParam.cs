@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-using nadena.dev.ndmf;
 using Samirin33.NDMF.Base;
 
 namespace Samirin33.NDMF.Components
@@ -50,9 +49,9 @@ namespace Samirin33.NDMF.Components
 
         public bool writeDefault = false;
 
-        public override void OnBuildSingle(BuildPhase buildPhase, bool beforeModularAvatar, SamirinMABaseSingle[] _MAScripts, GameObject avatarRootObject, Action<GameObject, SamirinMABaseSingle[]> invokeBuilder, Action<GameObject, SamirinMABaseSingle[]> invokeReplaceBuilder)
+        public override void OnBuildSingle(SamirinBuildPhase buildPhase, bool beforeModularAvatar, SamirinMABaseSingle[] _MAScripts, GameObject avatarRootObject, Action<GameObject, SamirinMABaseSingle[]> invokeBuilder, Action<GameObject, SamirinMABaseSingle[]> invokeReplaceBuilder)
         {
-            if (buildPhase == BuildPhase.Resolving && beforeModularAvatar)
+            if (buildPhase == SamirinBuildPhase.Resolving && beforeModularAvatar)
             {
                 invokeBuilder(avatarRootObject, _MAScripts);
 
@@ -83,7 +82,7 @@ namespace Samirin33.NDMF.Components
                 }
             }
 
-            if (buildPhase == BuildPhase.Optimizing && beforeModularAvatar)
+            if (buildPhase == SamirinBuildPhase.Optimizing && beforeModularAvatar)
             {
                 invokeReplaceBuilder?.Invoke(avatarRootObject, _MAScripts);
             }

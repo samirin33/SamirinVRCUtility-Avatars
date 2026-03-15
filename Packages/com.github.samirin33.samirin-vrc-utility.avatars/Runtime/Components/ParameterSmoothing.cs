@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using nadena.dev.ndmf;
 using Samirin33.NDMF.Base;
 using Samirin33.NDMF.Module;
 using UnityEditor;
@@ -23,9 +22,9 @@ namespace Samirin33.NDMF.Components
 
         const string FPSCounterGUID = "9b06db4aacbe94745a2bcd84f67103eb";
 
-        public override void OnBuildSingle(BuildPhase buildPhase, bool beforeModularAvatar, SamirinMABaseSingle[] _MAScripts, GameObject avatarRootObject, Action<GameObject, SamirinMABaseSingle[]> invokeBuilder, Action<GameObject, SamirinMABaseSingle[]> invokeReplaceBuilder)
+        public override void OnBuildSingle(SamirinBuildPhase buildPhase, bool beforeModularAvatar, SamirinMABaseSingle[] _MAScripts, GameObject avatarRootObject, Action<GameObject, SamirinMABaseSingle[]> invokeBuilder, Action<GameObject, SamirinMABaseSingle[]> invokeReplaceBuilder)
         {
-            if (buildPhase == BuildPhase.Resolving && beforeModularAvatar)
+            if (buildPhase == SamirinBuildPhase.Resolving && beforeModularAvatar)
             {
                 invokeBuilder(avatarRootObject, _MAScripts);
 
