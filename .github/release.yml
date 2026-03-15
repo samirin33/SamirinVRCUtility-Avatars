@@ -1,0 +1,18 @@
+# 自動生成リリースノートのテンプレート
+# https://docs.github.com/ja/repositories/releasing-projects-on-github/automatically-generated-release-notes
+changelog:
+  exclude:
+    authors:
+      - github-actions
+  categories:
+    - title: "✨ New Features"
+      labels:
+        - "enhancement"
+        - "feature"
+    - title: "🐛 Bug Fixes"
+      labels:
+        - "bug"
+        - "fix"
+    - title: "📦 Other Changes"
+      labels:
+        - "*"

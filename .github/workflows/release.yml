@@ -53,6 +53,42 @@ jobs:
           echo "unityPackage=${{ vars.PACKAGE_NAME }}-${{ steps.version.outputs.value }}.unitypackage" >> $GITHUB_ENV
           echo "version=${{ steps.version.outputs.value }}" >> $GITHUB_ENV
 
+      # 前回のリリースタグを取得（リリースが無い場合は空）
+      - name: Get previous release tag
+        id: pre_tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          res=$(curl -s -w "\n%{http_code}" -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/${{ github.repository }}/releases/latest")
+          http_code=$(echo "$res" | tail -n1)
+          if [ "$http_code" = "200" ]; then
+            pre_tag=$(echo "$res" | sed '$d' | jq -r .tag_name)
+          else
+            pre_tag=""
+          fi
+          echo "pre_tag=$pre_tag" >> $GITHUB_OUTPUT
+
+      # 前回リリースからの差分でリリースノート本文を自動生成
+      - name: Generate release notes
+        id: release_note
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          payload="{\"tag_name\": \"${{ env.version }}\", \"configuration_file_path\": \".github/release.yml\"}"
+          if [ -n "${{ steps.pre_tag.outputs.pre_tag }}" ]; then
+            payload="{\"tag_name\": \"${{ env.version }}\", \"previous_tag_name\": \"${{ steps.pre_tag.outputs.pre_tag }}\", \"configuration_file_path\": \".github/release.yml\"}"
+          fi
+          curl -s -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/generate-notes" \
+            -d "$payload" | jq -r .body > release_notes.md
+          if [ ! -s release_notes.md ]; then
+            echo "## Release ${{ env.version }}" > release_notes.md
+            echo "" >> release_notes.md
+            echo "See commit history for details." >> release_notes.md
+          fi
+
       # Zip the Package for release
       - name: Create Package Zip
         working-directory: "${{ env.packagePath }}"
@@ -85,3 +121,4 @@ jobs:
             ${{ env.unityPackage }}
             ${{ env.packagePath }}/package.json
           tag_name: ${{ env.version }}
+          body_path: release_notes.md
