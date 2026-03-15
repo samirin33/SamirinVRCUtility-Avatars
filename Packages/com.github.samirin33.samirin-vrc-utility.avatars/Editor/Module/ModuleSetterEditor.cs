@@ -20,6 +20,10 @@ namespace Samirin33.NDMF.Module.Editor
             {
                 serializedObject.Update();
 
+                EditorGUILayout.HelpBox(
+                    "Animatorで新しく取得できるパラメーターを追加することができます！",
+                    MessageType.Info);
+
                 // modulePrefabs以外をデフォルト表示
                 DrawPropertiesExcluding(serializedObject, "modulePrefabs", "m_Script");
 
@@ -33,7 +37,7 @@ namespace Samirin33.NDMF.Module.Editor
                 if (setter.modulePrefabs != null && setter.modulePrefabs.Length > 0)
                 {
                     EditorGUILayout.Space(10);
-                    EditorGUILayout.LabelField("プレファブ内のModuleParamInfo", EditorStyles.boldLabel);
+                    EditorGUILayout.LabelField("取得できるパラメーター");
 
                     foreach (var prefab in setter.modulePrefabs)
                     {
@@ -45,12 +49,13 @@ namespace Samirin33.NDMF.Module.Editor
                         EditorGUILayout.Space(5);
                         EditorGUILayout.BeginVertical(EditorStyles.helpBox);
 
-                        EditorGUILayout.LabelField(prefab.name, EditorStyles.boldLabel);
+                        EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                        EditorGUILayout.LabelField(prefab.name);
+                        EditorGUILayout.EndVertical();
 
                         foreach (var paramInfo in paramInfos)
                         {
                             var componentPath = GetGameObjectPath(paramInfo.gameObject, prefab.transform);
-                            EditorGUILayout.LabelField($"  [{componentPath}]", EditorStyles.miniLabel);
 
                             if (paramInfo.paramInfos == null || paramInfo.paramInfos.Length == 0)
                             {
@@ -58,26 +63,43 @@ namespace Samirin33.NDMF.Module.Editor
                                 continue;
                             }
 
-                            foreach (var param in paramInfo.paramInfos)
+                            for (var paramIndex = 0; paramIndex < paramInfo.paramInfos.Length; paramIndex++)
                             {
+                                var param = paramInfo.paramInfos[paramIndex];
                                 EditorGUILayout.BeginHorizontal();
                                 EditorGUILayout.PrefixLabel($"    {param.paramName}");
+                                GUILayout.FlexibleSpace();
                                 if (GUILayout.Button("コピー", GUILayout.Width(50)))
                                 {
                                     EditorGUIUtility.systemCopyBuffer = param.paramName ?? "";
+                                }
+                                if (GUILayout.Button("削除", GUILayout.Width(50)))
+                                {
+                                    var so = new SerializedObject(paramInfo);
+                                    var paramInfosProp = so.FindProperty("paramInfos");
+                                    if (paramInfosProp != null && paramIndex >= 0 && paramIndex < paramInfosProp.arraySize)
+                                    {
+                                        so.Update();
+                                        paramInfosProp.DeleteArrayElementAtIndex(paramIndex);
+                                        so.ApplyModifiedProperties();
+                                        EditorUtility.SetDirty(paramInfo);
+                                        AssetDatabase.SaveAssets();
+                                    }
+                                    break;
                                 }
                                 EditorGUILayout.EndHorizontal();
 
                                 var explanation = param.paramExplanation ?? "";
                                 var defaultStr = GetDefaultValueString(param);
-                                var explainWidth = EditorGUIUtility.currentViewWidth - 250f;
-                                var explainHeight = EditorStyles.wordWrappedLabel.CalcHeight(new GUIContent(explanation), Mathf.Max(explainWidth, 50f));
+                                var wordWrappedLabel = EditorStyles.wordWrappedLabel;
 
                                 EditorGUILayout.BeginHorizontal();
-                                EditorGUILayout.LabelField(param.paramType.ToString(), GUILayout.Width(80), GUILayout.Height(explainHeight));
-                                EditorGUILayout.LabelField(string.IsNullOrEmpty(defaultStr) ? "" : $"Default: {defaultStr}", GUILayout.Width(120), GUILayout.Height(explainHeight));
-                                DrawWithDefaultFont(() => EditorGUILayout.LabelField(explanation, EditorStyles.wordWrappedLabel, GUILayout.Height(explainHeight)));
+                                EditorGUILayout.LabelField($"Type: {param.paramType.ToString()}", GUILayout.Width(80));
+                                EditorGUILayout.LabelField(string.IsNullOrEmpty(defaultStr) ? "" : $"Default: {defaultStr}", GUILayout.Width(120));
                                 EditorGUILayout.EndHorizontal();
+                                EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                                DrawWithDefaultFont(() => EditorGUILayout.LabelField(explanation, wordWrappedLabel));
+                                EditorGUILayout.EndVertical();
                             }
                         }
 
@@ -262,7 +284,7 @@ namespace Samirin33.NDMF.Module.Editor
             else
             {
                 EditorGUILayout.BeginHorizontal();
-                if (GUILayout.Button("モジュールプレファブを追加"))
+                if (GUILayout.Button("パラメーター追加プレファブを追加"))
                 {
                     ShowPrefabSelectionMenu(availablePrefabs);
                 }
@@ -270,7 +292,7 @@ namespace Samirin33.NDMF.Module.Editor
             }
 
             EditorGUILayout.Space(3);
-            EditorGUILayout.PropertyField(prefabsProp, new GUIContent("選択中のプレファブ"), true);
+            DrawWithDefaultFont(() => EditorGUILayout.PropertyField(prefabsProp, new GUIContent("選択中のプレファブ"), true));
         }
 
         private static List<GameObject> GetPrefabsInFolder(string folderPath)

@@ -1,8 +1,10 @@
 using UnityEngine;
+using nadena.dev.ndmf;
 using Samirin33.NDMF.Base;
+
 namespace Samirin33.NDMF.Components
 {
-    [AddComponentMenu("SamirinVRC/GameObjectResetter")]
+    [AddComponentMenu("samirin33 VRC/GameObjectResetter")]
     public class GameObjectResetter : SamirinMABase
     {
         public bool objectEnable = false;
@@ -19,14 +21,22 @@ namespace Samirin33.NDMF.Components
 
         public bool destroyOnReset = false;
 
-        public override void OnBuildTransformingAfterMA(GameObject avatarRootObject)
+        public override void OnBuild(BuildPhase buildPhase, bool beforeModularAvatar, GameObject avatarRootObject)
         {
-            if (objectEnable)
+            if (buildPhase == BuildPhase.Transforming && !beforeModularAvatar)
             {
-                gameObject.SetActive(resetObjectEnable);
+                if (objectEnable)
+                {
+                    gameObject.SetActive(resetObjectEnable);
+                }
+            }
+            else if (buildPhase == BuildPhase.Resolving && beforeModularAvatar)
+            {
+                OnBuildResolvingBeforeMA(avatarRootObject);
             }
         }
-        public override void OnBuildResolvingBeforeMA(GameObject avatarRootObject)
+
+        private void OnBuildResolvingBeforeMA(GameObject avatarRootObject)
         {
             if (resetPosition)
             {
