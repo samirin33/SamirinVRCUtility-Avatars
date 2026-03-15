@@ -22,6 +22,8 @@ namespace Samirin33.NDMF.Components
 
         const string FPSCounterGUID = "9b06db4aacbe94745a2bcd84f67103eb";
 
+#if UNITY_EDITOR
+
         public override void OnBuildSingle(SamirinBuildPhase buildPhase, bool beforeModularAvatar, SamirinMABaseSingle[] _MAScripts, GameObject avatarRootObject, Action<GameObject, SamirinMABaseSingle[]> invokeBuilder, Action<GameObject, SamirinMABaseSingle[]> invokeReplaceBuilder)
         {
             if (buildPhase == SamirinBuildPhase.Resolving && beforeModularAvatar)
@@ -44,5 +46,7 @@ namespace Samirin33.NDMF.Components
                 Debug.Log("FPSCounter added to module setter");
             }
         }
+        
+#endif
     }
 }
