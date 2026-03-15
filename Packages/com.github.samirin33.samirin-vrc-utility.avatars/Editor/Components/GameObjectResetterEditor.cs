@@ -44,10 +44,14 @@ namespace Samirin33.NDMF.Components.Editor
             {
                 serializedObject.Update();
 
+                EditorGUILayout.HelpBox(
+                    "ビルド時にオブジェクトの有効/無効、位置、回転、スケールを再セットすることができます！",
+                    MessageType.Info);
+
                 var resetter = (GameObjectResetter)target;
 
                 // オブジェクトの有効/無効
-                EditorGUILayout.LabelField("オブジェクトの有効/無効", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("Active");
                 EditorGUILayout.BeginVertical(EditorStyles.helpBox);
                 EditorGUILayout.PropertyField(_objectEnable, new GUIContent("リセットする"));
                 if (_objectEnable.boolValue)
@@ -58,7 +62,7 @@ namespace Samirin33.NDMF.Components.Editor
                 EditorGUILayout.Space(5);
 
                 // Position
-                EditorGUILayout.LabelField("Position", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("Position");
                 EditorGUILayout.BeginVertical(EditorStyles.helpBox);
                 EditorGUILayout.PropertyField(_resetPosition, new GUIContent("リセットする"));
                 if (_resetPosition.boolValue)
@@ -76,7 +80,7 @@ namespace Samirin33.NDMF.Components.Editor
                 EditorGUILayout.Space(5);
 
                 // Rotation
-                EditorGUILayout.LabelField("Rotation", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("Rotation");
                 EditorGUILayout.BeginVertical(EditorStyles.helpBox);
                 EditorGUILayout.PropertyField(_resetRotation, new GUIContent("リセットする"));
                 if (_resetRotation.boolValue)
@@ -94,7 +98,7 @@ namespace Samirin33.NDMF.Components.Editor
                 EditorGUILayout.Space(5);
 
                 // Scale
-                EditorGUILayout.LabelField("Scale", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("Scale");
                 EditorGUILayout.BeginVertical(EditorStyles.helpBox);
                 EditorGUILayout.PropertyField(_resetScale, new GUIContent("リセットする"));
                 if (_resetScale.boolValue)
@@ -112,7 +116,7 @@ namespace Samirin33.NDMF.Components.Editor
                 EditorGUILayout.Space(5);
 
                 // リセット時に破棄
-                EditorGUILayout.LabelField("リセット時の動作", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("Destroy");
                 EditorGUILayout.BeginVertical(EditorStyles.helpBox);
                 EditorGUILayout.PropertyField(_destroyOnReset, new GUIContent("リセット時にオブジェクトを破棄"));
                 EditorGUILayout.EndVertical();

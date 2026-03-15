@@ -24,7 +24,11 @@ namespace Samirin33.NDMF.Components.Editor
             {
                 serializedObject.Update();
 
-                EditorGUILayout.LabelField("同期パラメータ設定", EditorStyles.boldLabel);
+                EditorGUILayout.HelpBox(
+                    "パラメーターの同期範囲や精度を削いでBit数を削減できます！",
+                    MessageType.Info);
+
+                EditorGUILayout.LabelField("同期パラメータ設定");
                 EditorGUILayout.BeginVertical(EditorStyles.helpBox);
                 if (_syncParamSettings != null)
                 {
@@ -34,11 +38,14 @@ namespace Samirin33.NDMF.Components.Editor
                         var paramNameProp = element.FindPropertyRelative("paramName");
                         var paramTypeProp = element.FindPropertyRelative("paramType");
                         var bitTypeProp = element.FindPropertyRelative("bitType");
+                        var smoothWeightProp = element.FindPropertyRelative("smoothWeight");
+                        var replaceWithSmoothedProp = element.FindPropertyRelative("replaceWithSmoothedInAnimator");
 
                         EditorGUILayout.BeginVertical(EditorStyles.helpBox, GUILayout.ExpandWidth(true));
 
                         EditorGUILayout.BeginHorizontal();
-                        EditorGUILayout.LabelField($"要素 {i + 1}", EditorStyles.boldLabel, GUILayout.Width(60));
+                        EditorGUILayout.LabelField(paramNameProp.stringValue);
+                        GUILayout.FlexibleSpace();
                         EditorGUI.BeginDisabledGroup(i == 0);
                         if (GUILayout.Button("↑", GUILayout.Width(24)))
                         {
@@ -71,6 +78,11 @@ namespace Samirin33.NDMF.Components.Editor
                         EditorGUILayout.PropertyField(bitTypeProp, new GUIContent("ビット数"));
 
                         var paramType = (HalfSyncParam.ParamType)paramTypeProp.enumValueIndex;
+                        if (IsFloatParamType(paramType))
+                        {
+                            EditorGUILayout.Slider(smoothWeightProp, 0.0001f, 0.9999f, new GUIContent("スムージング重み(高いほどゆっくり)"));
+                            EditorGUILayout.PropertyField(replaceWithSmoothedProp, new GUIContent("Animator内のパラメーターをSmoothedに置き換える"));
+                        }
                         var bitType = (HalfSyncParam.BitType)bitTypeProp.enumValueIndex;
                         var description = GetParamTypeDescription(paramType, bitType);
                         if (!string.IsNullOrEmpty(description))
@@ -80,7 +92,7 @@ namespace Samirin33.NDMF.Components.Editor
                         {
                             var paramName = paramNameProp.stringValue;
                             if (string.IsNullOrEmpty(paramName))
-                                paramName = $"Param_{paramType}_{bitType}";
+                                paramName = $"Param_{paramType}{bitType}";
                             var snappedName = $"{paramName}_Snapped";
                             var smoothedName = $"{paramName}_Smoothed";
 
@@ -112,6 +124,12 @@ namespace Samirin33.NDMF.Components.Editor
                         var bitTypeProp = newElement.FindPropertyRelative("bitType");
                         if (bitTypeProp != null)
                             bitTypeProp.enumValueIndex = (int)HalfSyncParam.BitType._4bit;
+                        var smoothWeightPropNew = newElement.FindPropertyRelative("smoothWeight");
+                        if (smoothWeightPropNew != null)
+                            smoothWeightPropNew.floatValue = 0.2f;
+                        var replaceWithSmoothedPropNew = newElement.FindPropertyRelative("replaceWithSmoothedInAnimator");
+                        if (replaceWithSmoothedPropNew != null)
+                            replaceWithSmoothedPropNew.boolValue = true;
                     }
                 }
                 EditorGUILayout.EndVertical();

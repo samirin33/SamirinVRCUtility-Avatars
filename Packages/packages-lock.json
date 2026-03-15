@@ -275,6 +275,12 @@
       "source": "embedded",
       "dependencies": {}
     },
+    "lyuma.av3emulator": {
+      "version": "file:lyuma.av3emulator",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {}
+    },
     "nadena.dev.misc-vrc-tools": {
       "version": "file:nadena.dev.misc-vrc-tools",
       "depth": 0,

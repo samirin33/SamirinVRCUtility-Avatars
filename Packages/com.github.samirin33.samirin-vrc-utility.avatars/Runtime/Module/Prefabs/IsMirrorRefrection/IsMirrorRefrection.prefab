@@ -93,7 +93,9 @@ MonoBehaviour:
   paramInfos:
   - paramName: IsMirrorRefrection
     paramType: 1
-    paramExplanation: 
+    paramExplanation: "\u5024\u304C-1\u306E\u6642 = \u5224\u5B9A\u6E96\u5099\u4E2D\n\u5024\u304C0\u306E\u6642
+      = Animator\u304CPlayerLocal\u30EC\u30A4\u30E4\u30FC\u306B\u3042\u308B\n\u5024\u304C1\u306E\u6642
+      = Animator\u304CMirrorRefrection\u30EC\u30A4\u30E4\u30FC\u306B\u3042\u308B"
     defaultFloat: -1
     defaultInt: 0
     defaultBool: 0

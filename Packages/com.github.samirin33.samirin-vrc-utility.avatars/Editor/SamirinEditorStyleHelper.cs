@@ -7,7 +7,7 @@ namespace Samirin33.Editor
 {
     public static class SamirinEditorStyleHelper
     {
-        private const string EditorFontGUID = "3fd79a2a11fea6345bacc1632a700394";
+        private const string EditorFontGUID = "04057a843a9bbc940b6ccd557401ad44";
         private const string BackgroundImageGUID = "cd4f6a17398736c48a4cfa0d8c9f6cb5";
 
         private const float BackgroundAlpha = 0.3f;

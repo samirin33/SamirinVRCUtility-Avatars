@@ -46,8 +46,12 @@ namespace Samirin33.NDMF.Components.Editor
             {
                 serializedObject.Update();
 
+                EditorGUILayout.HelpBox(
+                    "オブジェクトをワールド固定させることができます！",
+                    MessageType.Info);
+
                 // Position
-                EditorGUILayout.LabelField("Position", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("Position");
                 EditorGUILayout.BeginVertical(EditorStyles.helpBox);
                 EditorGUILayout.PropertyField(_fixPosition, new GUIContent("固定する"));
                 if (_fixPosition.boolValue)
@@ -62,7 +66,7 @@ namespace Samirin33.NDMF.Components.Editor
                 EditorGUILayout.Space(5);
 
                 // Rotation
-                EditorGUILayout.LabelField("Rotation", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("Rotation");
                 EditorGUILayout.BeginVertical(EditorStyles.helpBox);
                 EditorGUILayout.PropertyField(_fixRotation, new GUIContent("固定する"));
                 if (_fixRotation.boolValue)
@@ -77,7 +81,7 @@ namespace Samirin33.NDMF.Components.Editor
                 EditorGUILayout.Space(5);
 
                 // Scale
-                EditorGUILayout.LabelField("Scale", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("Scale");
                 EditorGUILayout.BeginVertical(EditorStyles.helpBox);
                 EditorGUILayout.PropertyField(_fixScale, new GUIContent("固定する"));
                 if (_fixScale.boolValue)
@@ -92,10 +96,10 @@ namespace Samirin33.NDMF.Components.Editor
                 EditorGUILayout.Space(5);
 
                 // エディタ適用
-                EditorGUILayout.LabelField("エディタ", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("エディタ");
                 EditorGUILayout.BeginVertical(EditorStyles.helpBox);
                 EditorGUILayout.PropertyField(_editorApply, new GUIContent("プレイモード外でも適用"));
-                DrawHelpBoxWithDefaultFont("有効にすると、プレイモードでない際にも設定がシーンビューに反映されます。", MessageType.Info);
+                DrawHelpBoxWithDefaultFont("有効にすると、プレイモードでない際にも設定がシーンビューに反映されます。", MessageType.None);
                 EditorGUILayout.EndVertical();
 
                 serializedObject.ApplyModifiedProperties();
