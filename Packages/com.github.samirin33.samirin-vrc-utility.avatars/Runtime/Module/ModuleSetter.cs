@@ -1,22 +1,15 @@
 using UnityEngine;
 using VRC.SDKBase;
-using nadena.dev.ndmf;
 using Samirin33.NDMF.Base;
 
 namespace Samirin33.NDMF.Module
 {
-    [AddComponentMenu("samirin33 VRC/ModuleSetter"), DisallowMultipleComponent]
+    [AddComponentMenu("SamirinVRC/ModuleSetter")]
     public class ModuleSetter : SamirinMABase
     {
-        void Reset()
-        {
-            priority = 300;
-        }
         public GameObject[] modulePrefabs;
-        public override void OnBuild(BuildPhase buildPhase, bool beforeModularAvatar, GameObject avatarRootObject)
+        public override void OnBuildResolvingBeforeMA(GameObject avatarRootObject)
         {
-            if (buildPhase != BuildPhase.Transforming || !beforeModularAvatar) return;
-
             var avatarObject = avatarRootObject;
             if (modulePrefabs == null) return;
 

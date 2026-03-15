@@ -93,13 +93,19 @@ MonoBehaviour:
   paramInfos:
   - paramName: FPS/Result
     paramType: 1
-    paramExplanation: "FPS\u306E\u5024\u3092int(1~255)\u3067\u53D6\u5F97\u3057\u307E\u3059\u3002"
+    paramExplanation: 
     defaultFloat: 0
     defaultInt: 0
     defaultBool: 0
   - paramName: FPS/Value
     paramType: 1
-    paramExplanation: "FPS\u306E\u5024\u3092float(0~1)\u3067\u53D6\u5F97\u3057\u307E\u3059\u3002"
+    paramExplanation: 
+    defaultFloat: 0
+    defaultInt: 0
+    defaultBool: 0
+  - paramName: FPS/SmoothedValue
+    paramType: 1
+    paramExplanation: 
     defaultFloat: 0
     defaultInt: 0
     defaultBool: 0

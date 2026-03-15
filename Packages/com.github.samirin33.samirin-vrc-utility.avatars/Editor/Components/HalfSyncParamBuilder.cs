@@ -6,21 +6,12 @@ using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;
 using nadena.dev.modular_avatar.core;
-using VRC.SDK3.Avatars.Components;
-using Samirin33.NDMF.Base.Plugin;
 using Samirin33.NDMF.Components;
 
 namespace Samirin33.NDMF.Components.Editor
 {
     public static class HalfSyncParamBuilder
     {
-        [InitializeOnLoadMethod]
-        private static void RegisterBuilder()
-        {
-            SamirinMABaseSingleBuildRegistry.Register<HalfSyncParam>(Build);
-            SamirinMABaseSingleBuildRegistry.RegisterReplace<HalfSyncParam>(RunReplace);
-        }
-
         private const string EmptyMotionGUID = "4de039275b65be24c8f0a641d7a44924";
         private static string GeneratedFolder => "Assets/Generated/SamirinVRCUtility/HalfSyncParam";
 
@@ -51,41 +42,6 @@ namespace Samirin33.NDMF.Components.Editor
             AddModularAvatarModule(avatarRootObject, controller, paramNamesToRegister);
         }
 
-        /// <summary>
-        /// 置換処理で除外するレイヤー名（Smoothing 関連）。ParameterSmoothing / HalfSyncParam 由来のレイヤーを除外する。
-        /// </summary>
-        private static readonly string[] DefaultExcludedLayerNames = { "ParameterSmoothing", "Smoothed" };
-
-        /// <summary>
-        /// Generating 後（afterModularAvatar）で呼ばれる置換処理。VRCAvatarDescriptor の FX レイヤーに作用する。
-        /// Smoothing 関連レイヤーは除外レイヤーとして指定し、置換対象外とする。
-        /// </summary>
-        public static void RunReplace(GameObject avatarRootObject, params HalfSyncParam[] halfSyncParams)
-        {
-            if (avatarRootObject == null || halfSyncParams == null || halfSyncParams.Length == 0)
-                return;
-
-            var (mergedList, _) = MergeSettingsFromModule(halfSyncParams);
-            var toReplace = mergedList
-                .Where(s => IsFloatParamType(s.paramType) && s.replaceWithSmoothedInAnimator)
-                .ToList();
-            if (toReplace.Count == 0) return;
-
-            var fxController = VRCAvatarDescriptorControllerUtility.GetController(
-                avatarRootObject,
-                VRCAvatarDescriptor.AnimLayerType.FX);
-            if (fxController == null) return;
-
-            foreach (var setting in toReplace)
-            {
-                var paramName = string.IsNullOrEmpty(setting.paramName)
-                    ? $"Param_{setting.paramType}_{setting.bitType}"
-                    : setting.paramName;
-                var smoothedName = $"{paramName}_Smoothed";
-                AnimatorParameterReplaceUtility.ReplaceParameterReferences(fxController, paramName, smoothedName, DefaultExcludedLayerNames);
-            }
-        }
-
         private static (List<HalfSyncParam.syncParamSetting> settings, bool writeDefault) MergeSettingsFromModule(
             HalfSyncParam[] halfSyncParams)
         {
@@ -102,7 +58,7 @@ namespace Samirin33.NDMF.Components.Editor
                     if (!BitCountMap.ContainsKey(setting.bitType)) continue;
 
                     var paramName = string.IsNullOrEmpty(setting.paramName)
-                        ? $"Param_{setting.paramType}{setting.bitType}"
+                        ? $"Param_{setting.paramType}_{setting.bitType}"
                         : setting.paramName;
 
                     if (processedParamNames.Contains(paramName))
@@ -146,7 +102,7 @@ namespace Samirin33.NDMF.Components.Editor
             foreach (var setting in settings)
             {
                 var bitCount = BitCountMap[setting.bitType];
-                var paramName = string.IsNullOrEmpty(setting.paramName) ? $"Param_{setting.paramType}{setting.bitType}" : setting.paramName;
+                var paramName = string.IsNullOrEmpty(setting.paramName) ? $"Param_{setting.paramType}_{setting.bitType}" : setting.paramName;
                 var maxValue = (1 << bitCount) - 1;
                 var isFloat = IsFloatParamType(setting.paramType);
                 var intParamName = isFloat ? $"{paramName}_Int" : paramName;
@@ -183,6 +139,10 @@ namespace Samirin33.NDMF.Components.Editor
                 var floatLayer = CreateFloatConvertLayer(settings, writeDefault);
                 if (floatLayer != null)
                     controller.AddLayer(floatLayer);
+
+                var smoothedLayer = CreateSmoothedLayer(settings, controller);
+                if (smoothedLayer != null)
+                    controller.AddLayer(smoothedLayer);
             }
 
             foreach (var (layer, _, _, _, _, _) in layersToAdd)
@@ -206,7 +166,7 @@ namespace Samirin33.NDMF.Components.Editor
         private static AnimatorControllerLayer CreateLayerForParam(string paramName, int bitCount, int maxValue,
             AnimationClip emptyMotion, bool writeDefault)
         {
-            var layerName = $"Convert_IntParam{paramName}{bitCount}bit";
+            var layerName = $"Convert_IntParam{paramName}_{bitCount}bit";
             var rootSm = new AnimatorStateMachine { name = layerName };
 
             var localSm = new AnimatorStateMachine { name = "Local" };
@@ -350,7 +310,7 @@ namespace Samirin33.NDMF.Components.Editor
                             var bitCount = BitCountMap[setting.bitType];
                             var maxValue = (1 << bitCount) - 1;
                             var resolution = 1f / maxValue;
-                            var paramName = string.IsNullOrEmpty(setting.paramName) ? $"Param_{setting.paramType}{setting.bitType}" : setting.paramName;
+                            var paramName = string.IsNullOrEmpty(setting.paramName) ? $"Param_{setting.paramType}_{setting.bitType}" : setting.paramName;
                             var intParamName = $"{paramName}_Int";
                             var (sourceMin, sourceMax, destMin, destMax) = GetFloatConvertRanges(setting.paramType, maxValue);
 
@@ -358,7 +318,7 @@ namespace Samirin33.NDMF.Components.Editor
                             if (behaviour != null)
                             {
                                 AssetDatabase.AddObjectToAsset(behaviour, controller);
-                                SetParamDriverCopy(behaviour, paramName, intParamName, sourceMin + resolution, sourceMax - resolution, 0, maxValue, clearFirst: true);
+                                SetParamDriverCopy(behaviour, paramName, intParamName, sourceMin - resolution, sourceMax - resolution, 0, maxValue, clearFirst: true);
                                 SetParamDriverCopy(behaviour, intParamName, $"{paramName}_Snapped", 0, maxValue, destMin, destMax, clearFirst: false);
                             }
                         }
@@ -370,7 +330,7 @@ namespace Samirin33.NDMF.Components.Editor
                             var bitCount = BitCountMap[setting.bitType];
                             var maxValue = (1 << bitCount) - 1;
                             var resolution = 1f / maxValue;
-                            var paramName = string.IsNullOrEmpty(setting.paramName) ? $"Param_{setting.paramType}{setting.bitType}" : setting.paramName;
+                            var paramName = string.IsNullOrEmpty(setting.paramName) ? $"Param_{setting.paramType}_{setting.bitType}" : setting.paramName;
                             var intParamName = $"{paramName}_Int";
                             var (sourceMin, sourceMax, destMin, destMax) = GetFloatConvertRanges(setting.paramType, maxValue);
 
@@ -442,12 +402,214 @@ namespace Samirin33.NDMF.Components.Editor
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
+        private static AnimatorControllerLayer CreateSmoothedLayer(HalfSyncParam.syncParamSetting[] settings,
+            AnimatorController controller)
+        {
+            var floatSettings = settings.Where(s => s.paramType == HalfSyncParam.ParamType.FloatZeroToPlusOne || s.paramType == HalfSyncParam.ParamType.FloatMinusOneToPlusOne).ToArray();
+            if (floatSettings.Length == 0) return null;
+
+            controller.AddParameter("SUM/HalfParam/SmoothWeight", AnimatorControllerParameterType.Float);
+            controller.AddParameter(new AnimatorControllerParameter
+            {
+                name = "ConstOne",
+                type = AnimatorControllerParameterType.Float,
+                defaultFloat = 1f
+            });
+            controller.AddParameter("FPS/Value", AnimatorControllerParameterType.Float);
+
+            var rootSm = new AnimatorStateMachine { name = "Smoothed" };
+            var smoothingState = rootSm.AddState("Smoothing", new Vector3(300, 120, 0));
+            smoothingState.writeDefaultValues = true;
+            rootSm.defaultState = smoothingState;
+
+            var directBlendTree = CreateDirectBlendTree(floatSettings, controller);
+            smoothingState.motion = directBlendTree;
+
+            return new AnimatorControllerLayer
+            {
+                name = "Smoothed",
+                defaultWeight = 1f,
+                stateMachine = rootSm
+            };
+        }
+
+        private static BlendTree CreateDirectBlendTree(HalfSyncParam.syncParamSetting[] floatSettings,
+            AnimatorController controller)
+        {
+            var firstParamName = string.IsNullOrEmpty(floatSettings[0].paramName)
+                ? $"Param_{floatSettings[0].paramType}_{floatSettings[0].bitType}"
+                : floatSettings[0].paramName;
+
+            var directTree = new BlendTree
+            {
+                name = "Direct",
+                blendType = BlendTreeType.Direct,
+                blendParameter = firstParamName,
+                blendParameterY = firstParamName,
+                useAutomaticThresholds = true,
+                minThreshold = 0f,
+                maxThreshold = 1f
+            };
+            AssetDatabase.AddObjectToAsset(directTree, controller);
+
+            var fpsWeightFix = CreateFPSWeightFixBlendTree(controller);
+            directTree.AddChild(fpsWeightFix, 0f);
+
+            for (int i = 0; i < floatSettings.Length; i++)
+            {
+                var paramName = string.IsNullOrEmpty(floatSettings[i].paramName)
+                    ? $"Param_{floatSettings[i].paramType}_{floatSettings[i].bitType}"
+                    : floatSettings[i].paramName;
+                var (_, _, destMin, destMax) = GetFloatConvertRanges(floatSettings[i].paramType, 0);
+                var smoothedTree = CreateParamSmoothedBlendTree(paramName, controller, destMin, destMax);
+                var threshold = floatSettings.Length == 1 ? 1f : (i == 0 ? 0.5f : 1f);
+                directTree.AddChild(smoothedTree, threshold);
+            }
+
+            SetDirectBlendTreeChildrenParameter(directTree, "ConstOne");
+
+            return directTree;
+        }
+
+        private static void SetDirectBlendTreeChildrenParameter(BlendTree blendTree, string parameterName)
+        {
+            var so = new SerializedObject(blendTree);
+            var childrenProp = so.FindProperty("m_Childs");
+            if (childrenProp == null) return;
+
+            for (int i = 0; i < childrenProp.arraySize; i++)
+            {
+                var childProp = childrenProp.GetArrayElementAtIndex(i);
+                var directBlendProp = childProp.FindPropertyRelative("m_DirectBlendParameter");
+                if (directBlendProp != null)
+                    directBlendProp.stringValue = parameterName;
+
+                var motionProp = childProp.FindPropertyRelative("m_Motion");
+                if (motionProp != null && motionProp.objectReferenceValue is BlendTree childTree)
+                    SetDirectBlendTreeChildrenParameter(childTree, parameterName);
+            }
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static BlendTree CreateFPSWeightFixBlendTree(AnimatorController controller)
+        {
+            var weight0 = CreateEmbeddedWeightClip(0.5f, "Weight 0", controller);
+            var weight1 = CreateEmbeddedWeightClip(0.9f, "Weight 1", controller);
+
+            var tree = new BlendTree
+            {
+                name = "FPSWeightFix",
+                blendType = BlendTreeType.Simple1D,
+                blendParameter = "FPS/Value",
+                useAutomaticThresholds = true,
+                minThreshold = 0f,
+                maxThreshold = 1f
+            };
+            AssetDatabase.AddObjectToAsset(tree, controller);
+            tree.AddChild(weight0, 0f);
+            tree.AddChild(weight1, 1f);
+            return tree;
+        }
+
+        private static BlendTree CreateParamSmoothedBlendTree(string paramName, AnimatorController controller, float rangeMin, float rangeMax)
+        {
+            var snappedParamName = $"{paramName}_Snapped";
+            var smoothedParamName = $"{paramName}_Smoothed";
+
+            var clip0 = CreateEmbeddedParamClip(smoothedParamName, rangeMin, controller);
+            var clip1 = CreateEmbeddedParamClip(smoothedParamName, rangeMax, controller);
+
+            var rawTree = CreateRawBlendTree(snappedParamName, smoothedParamName, clip0, clip1, controller, rangeMin, rangeMax);
+            var smoothTree = CreateSmoothBlendTree(paramName, smoothedParamName, clip0, clip1, controller, rangeMin, rangeMax);
+
+            var tree = new BlendTree
+            {
+                name = smoothedParamName,
+                blendType = BlendTreeType.Simple1D,
+                blendParameter = "SUM/HalfParam/SmoothWeight",
+                useAutomaticThresholds = true,
+                minThreshold = 0f,
+                maxThreshold = 1f
+            };
+            AssetDatabase.AddObjectToAsset(tree, controller);
+            tree.AddChild(rawTree, 0f);
+            tree.AddChild(smoothTree, 1f);
+            return tree;
+        }
+
+        private static BlendTree CreateRawBlendTree(string snappedParamName, string smoothedParamName,
+            AnimationClip clip0, AnimationClip clip1, AnimatorController controller, float rangeMin, float rangeMax)
+        {
+            var tree = new BlendTree
+            {
+                name = "Raw",
+                blendType = BlendTreeType.Simple1D,
+                blendParameter = snappedParamName,
+                useAutomaticThresholds = true,
+                minThreshold = rangeMin,
+                maxThreshold = rangeMax
+            };
+            AssetDatabase.AddObjectToAsset(tree, controller);
+            tree.AddChild(clip0, rangeMin);
+            tree.AddChild(clip1, rangeMax);
+            return tree;
+        }
+
+        private static BlendTree CreateSmoothBlendTree(string paramName, string smoothedParamName,
+            AnimationClip clip0, AnimationClip clip1, AnimatorController controller, float rangeMin, float rangeMax)
+        {
+            var tree = new BlendTree
+            {
+                name = "Smooth",
+                blendType = BlendTreeType.Simple1D,
+                blendParameter = smoothedParamName,
+                useAutomaticThresholds = true,
+                minThreshold = rangeMin,
+                maxThreshold = rangeMax
+            };
+            AssetDatabase.AddObjectToAsset(tree, controller);
+            tree.AddChild(clip0, rangeMin);
+            tree.AddChild(clip1, rangeMax);
+            return tree;
+        }
+
+        private static AnimationClip CreateEmbeddedParamClip(string smoothedParamName, float value,
+            AnimatorController controller)
+        {
+            var clip = CreateAnimatorParamClip(smoothedParamName, value);
+            clip.name = $"{smoothedParamName} {value}";
+            AssetDatabase.AddObjectToAsset(clip, controller);
+            return clip;
+        }
+
+        private static AnimationClip CreateEmbeddedWeightClip(float value, string clipName, AnimatorController controller)
+        {
+            var clip = CreateAnimatorParamClip("SUM/HalfParam/SmoothWeight", value);
+            clip.name = clipName;
+            AssetDatabase.AddObjectToAsset(clip, controller);
+            return clip;
+        }
+
+        private static AnimationClip CreateAnimatorParamClip(string paramName, float value)
+        {
+            var clip = new AnimationClip();
+            var curve = AnimationCurve.Constant(0f, 0f, value);
+            var binding = new EditorCurveBinding
+            {
+                path = "",
+                type = typeof(Animator),
+                propertyName = paramName
+            };
+            AnimationUtility.SetEditorCurve(clip, binding, curve);
+            return clip;
+        }
+
         private static void AddParamDriverBehaviours(AnimatorController controller, string paramName, int bitCount, int maxValue,
             Type paramDriverType)
         {
             if (paramDriverType == null || !typeof(StateMachineBehaviour).IsAssignableFrom(paramDriverType)) return;
 
-            var layerName = $"Convert_IntParam{paramName}{bitCount}bit";
+            var layerName = $"Convert_IntParam{paramName}_{bitCount}bit";
             foreach (var layer in controller.layers)
             {
                 if (layer.name != layerName) continue;
@@ -518,15 +680,20 @@ namespace Samirin33.NDMF.Components.Editor
             }
 
             var typeProp = entry.FindPropertyRelative("type");
-            if (typeProp != null && typeProp.propertyType == SerializedPropertyType.Enum)
-                typeProp.enumValueIndex = 0; // 0 = Set (enum は enumValueIndex のみ使用可能)
+            if (typeProp != null)
+            {
+                if (typeProp.propertyType == SerializedPropertyType.Enum)
+                    typeProp.enumValueIndex = 0; // 0 = Set
+                else
+                    typeProp.intValue = 0;
+            }
 
             var sourceProp = entry.FindPropertyRelative("source");
             if (sourceProp != null) sourceProp.stringValue = "";
             var valueMinProp = entry.FindPropertyRelative("valueMin");
-            if (valueMinProp != null) valueMinProp.floatValue = 0f;
+            if (valueMinProp != null) valueMinProp.intValue = 0;
             var valueMaxProp = entry.FindPropertyRelative("valueMax");
-            if (valueMaxProp != null) valueMaxProp.floatValue = 0f;
+            if (valueMaxProp != null) valueMaxProp.intValue = 0;
         }
 
         private static AnimationClip LoadEmptyMotion()
@@ -552,15 +719,35 @@ namespace Samirin33.NDMF.Components.Editor
             return emptyClip;
         }
 
+        /// <summary>
+        /// VRCAvatarParameterDriver (VRC Avatar Parameter Driver) の Type を取得。
+        /// </summary>
         private static Type GetVRCAvatarParameterDriverType()
         {
-            return typeof(VRCAvatarParameterDriver);
+            var t = Type.GetType("VRC.SDK3.Avatars.Module.VRCAvatarParameterDriver, VRCSDK3A");
+            if (t != null && typeof(StateMachineBehaviour).IsAssignableFrom(t))
+                return t;
+
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                try
+                {
+                    t = asm.GetType("VRC.SDK3.Avatars.Module.VRCAvatarParameterDriver");
+                    if (t != null && typeof(StateMachineBehaviour).IsAssignableFrom(t))
+                        return t;
+                }
+                catch { /* 無視 */ }
+            }
+
+            return null;
         }
 
         private static void AddModularAvatarModule(GameObject componentObject, AnimatorController controller,
             List<(string name, ParameterSyncType syncType)> paramNamesToRegister)
         {
-            var mergeAnimator = componentObject.AddComponent<ModularAvatarMergeAnimator>();
+            var mergeAnimator = componentObject.GetComponent<ModularAvatarMergeAnimator>();
+            if (mergeAnimator == null)
+                mergeAnimator = componentObject.AddComponent<ModularAvatarMergeAnimator>();
 
             mergeAnimator.animator = controller;
             mergeAnimator.layerPriority = 0;

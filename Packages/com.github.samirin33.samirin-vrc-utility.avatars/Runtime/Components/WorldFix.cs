@@ -1,6 +1,5 @@
 using UnityEngine;
 using UnityEngine.Animations;
-using nadena.dev.ndmf;
 using Samirin33.NDMF.Base;
 
 #if UNITY_EDITOR
@@ -10,7 +9,6 @@ using UnityEditor;
 namespace Samirin33.NDMF.Components
 {
     [ExecuteAlways]
-    [AddComponentMenu("samirin33 VRC/WorldFix")]
     public class WorldFix : SamirinMABase
     {
         private const string WorldPrefabGUID = "d5bf50393e094784cbe1cf44fca53dea";
@@ -21,11 +19,10 @@ namespace Samirin33.NDMF.Components
         public bool rotationX = true, rotationY = true, rotationZ = true;
         public bool fixScale = true;
         public bool scaleX = true, scaleY = true, scaleZ = true;
-        public bool editorApply = true;
+        public bool editorApply = false;
 
-        public override void OnBuild(BuildPhase buildPhase, bool beforeModularAvatar, GameObject avatarRootObject)
+        public override void OnBuildResolvingBeforeMA(GameObject avatarRootObject)
         {
-            if (buildPhase != BuildPhase.Resolving || !beforeModularAvatar) return;
 #if UNITY_EDITOR
             var sourceTransform = GetWorldPrefabTransform();
             if (sourceTransform == null) return;
