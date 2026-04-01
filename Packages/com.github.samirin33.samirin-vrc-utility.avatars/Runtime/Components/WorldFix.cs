@@ -12,7 +12,7 @@ namespace Samirin33.NDMF.Components
     [AddComponentMenu("samirin33 VRC/WorldFix")]
     public class WorldFix : SamirinMABase
     {
-        private const string WorldPrefabGUID = "d5bf50393e094784cbe1cf44fca53dea";
+        private const string WorldPrefabGUID = "b68724081431dfe428986a441453c12b";
 
         public bool fixPosition = true;
         public bool positionX = true, positionY = true, positionZ = true;
