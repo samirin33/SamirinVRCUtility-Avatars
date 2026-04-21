@@ -31,7 +31,7 @@ https://samirin33.github.io/Samirin33VPM/
 
 各コンポーネントは **Add Component** から **`samirin33 VRC`** カテゴリで追加できます。
 
-詳細は **[機能別ドキュメント](docs/README.md)** を参照してください。
+詳細は **[機能別ドキュメント](./Packages/com.github.samirin33.samirin-vrc-utility.avatars/docs/README.md)** を参照してください。
 
 ## ライセンス
 
