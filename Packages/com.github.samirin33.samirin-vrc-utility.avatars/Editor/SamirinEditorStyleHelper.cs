@@ -255,6 +255,49 @@ namespace Samirin33.Editor
         {
             var style = SamirinEditorPreferences.UseCustomBackground ? BlueBackgroundStyle : MinimalBoxStyle;
             EditorGUILayout.BeginVertical(style);
+            DrawWithBlueBackgroundContent(drawContent);
+        }
+
+        /// <summary>
+        /// <see cref="EditorWindow.position"/> 全体など、指定の矩形内に青背景（またはミニマル枠）を拡大して塗る。
+        /// 内部で <c>GUILayout.BeginArea</c> を行う。
+        /// </summary>
+        public static void DrawWithBlueBackground(Action drawContent, Rect area)
+        {
+            var style = SamirinEditorPreferences.UseCustomBackground ? BlueBackgroundStyle : MinimalBoxStyle;
+            GUILayout.BeginArea(area);
+            try
+            {
+                EditorGUILayout.BeginVertical(style, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+                DrawWithBlueBackgroundContent(drawContent);
+            }
+            finally
+            {
+                GUILayout.EndArea();
+            }
+        }
+
+        /// <summary>
+        /// <see cref="UnityEditor.Editor.OnInspectorGUI"/> や <see cref="UnityEditor.SettingsProvider"/>.<c>OnGUI</c> 用。
+        /// <see cref="EditorWindow.position"/> は使えないため、<see cref="EditorGUIUtility.currentViewWidth"/> と十分な高さで塗る。
+        /// </summary>
+        public static void DrawWithBlueBackgroundForInspectorOrSettings(Action drawContent)
+        {
+            float w = EditorGUIUtility.currentViewWidth;
+            if (w < 4f) w = 800f;
+            DrawWithBlueBackground(drawContent, new Rect(0, 0, w, 4000f));
+        }
+
+        /// <summary>
+        /// <see cref="UnityEditor.SettingsProvider"/>.<c>OnGUI</c> 用（<see cref="DrawWithBlueBackgroundForInspectorOrSettings"/> と同じ挙動）。
+        /// </summary>
+        public static void DrawWithBlueBackgroundForSettingsGui(Action drawContent)
+        {
+            DrawWithBlueBackgroundForInspectorOrSettings(drawContent);
+        }
+
+        private static void DrawWithBlueBackgroundContent(Action drawContent)
+        {
             Font previousFont = null;
             if (SamirinEditorPreferences.UseCustomFont && EditorFont != null)
             {

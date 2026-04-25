@@ -12,12 +12,12 @@ namespace Samirin33.NDMF.Base.Editor
     {
         public override void OnInspectorGUI()
         {
-            SamirinEditorStyleHelper.DrawWithBlueBackground(() => DrawDefaultInspector());
+            SamirinEditorStyleHelper.DrawWithBlueBackgroundForInspectorOrSettings(() => DrawDefaultInspector());
         }
 
         protected void DrawWithBlueBackground(Action drawContent)
         {
-            SamirinEditorStyleHelper.DrawWithBlueBackground(drawContent);
+            SamirinEditorStyleHelper.DrawWithBlueBackgroundForInspectorOrSettings(drawContent);
         }
 
         protected void DrawHelpBoxWithDefaultFont(string message, MessageType type)
