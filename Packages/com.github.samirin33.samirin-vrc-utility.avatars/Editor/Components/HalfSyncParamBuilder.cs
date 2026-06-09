@@ -79,7 +79,7 @@ namespace Samirin33.NDMF.Components.Editor
             foreach (var setting in toReplace)
             {
                 var paramName = string.IsNullOrEmpty(setting.paramName)
-                    ? $"Param_{setting.paramType}_{setting.bitType}"
+                    ? $"Param_{setting.paramType}{setting.bitType}"
                     : setting.paramName;
                 var smoothedName = $"{paramName}_Smoothed";
                 AnimatorParameterReplaceUtility.ReplaceParameterReferences(fxController, paramName, smoothedName, DefaultExcludedLayerNames);
@@ -135,7 +135,11 @@ namespace Samirin33.NDMF.Components.Editor
                 return null;
             }
 
-            var controller = AnimatorController.CreateAnimatorControllerAtPath($"{GeneratedFolder}/HalfSyncParam_Generated.controller");
+            var controllerPath = $"{GeneratedFolder}/HalfSyncParam_Generated.controller";
+            if (AssetDatabase.LoadAssetAtPath<AnimatorController>(controllerPath) != null)
+                AssetDatabase.DeleteAsset(controllerPath);
+
+            var controller = AnimatorController.CreateAnimatorControllerAtPath(controllerPath);
             if (controller == null)
                 return null;
 
@@ -188,6 +192,8 @@ namespace Samirin33.NDMF.Components.Editor
             foreach (var (layer, _, _, _, _, _) in layersToAdd)
                 controller.AddLayer(layer);
 
+            RegisterControllerHierarchy(controller);
+
             foreach (var (_, _, intParamName, bitCount, maxValue, _) in layersToAdd)
                 AddParamDriverBehaviours(controller, intParamName, bitCount, maxValue, paramDriverType);
 
@@ -196,11 +202,64 @@ namespace Samirin33.NDMF.Components.Editor
             EditorUtility.SetDirty(controller);
             AssetDatabase.SaveAssets();
 
-            var controllerPath = $"{GeneratedFolder}/HalfSyncParam_Generated.controller";
             AssetDatabase.ImportAsset(controllerPath, ImportAssetOptions.ForceUpdate);
             UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
 
             return controller;
+        }
+
+        /// <summary>
+        /// State がコントローラーのサブアセットのとき、AddStateMachineBehaviour は Behaviour を自動登録するため二重登録を避ける。
+        /// </summary>
+        private static void EnsureSubAsset(UnityEngine.Object obj, UnityEngine.Object mainAsset)
+        {
+            if (obj == null || mainAsset == null) return;
+            var mainPath = AssetDatabase.GetAssetPath(mainAsset);
+            if (string.IsNullOrEmpty(mainPath)) return;
+            if (AssetDatabase.GetAssetPath(obj) == mainPath)
+                return;
+            AssetDatabase.AddObjectToAsset(obj, mainAsset);
+        }
+
+        private static void RegisterControllerHierarchy(AnimatorController controller)
+        {
+            if (controller == null) return;
+            foreach (var layer in controller.layers)
+            {
+                if (layer.stateMachine != null)
+                    RegisterStateMachineHierarchy(layer.stateMachine, controller);
+            }
+        }
+
+        private static void RegisterStateMachineHierarchy(AnimatorStateMachine stateMachine, AnimatorController controller)
+        {
+            if (stateMachine == null || controller == null) return;
+
+            EnsureSubAsset(stateMachine, controller);
+
+            foreach (var transition in stateMachine.anyStateTransitions)
+                EnsureSubAsset(transition, controller);
+
+            foreach (var transition in stateMachine.entryTransitions)
+                EnsureSubAsset(transition, controller);
+
+            foreach (var childState in stateMachine.states)
+            {
+                if (childState.state == null) continue;
+                EnsureSubAsset(childState.state, controller);
+                foreach (var transition in childState.state.transitions)
+                    EnsureSubAsset(transition, controller);
+            }
+
+            foreach (var childMachine in stateMachine.stateMachines)
+            {
+                if (childMachine.stateMachine == null) continue;
+                foreach (var transition in stateMachine.GetStateMachineTransitions(childMachine.stateMachine))
+                    EnsureSubAsset(transition, controller);
+                RegisterStateMachineHierarchy(childMachine.stateMachine, controller);
+            }
+
+            EditorUtility.SetDirty(stateMachine);
         }
 
         private static AnimatorControllerLayer CreateLayerForParam(string paramName, int bitCount, int maxValue,
@@ -357,7 +416,7 @@ namespace Samirin33.NDMF.Components.Editor
                             var behaviour = state.state.AddStateMachineBehaviour(paramDriverType);
                             if (behaviour != null)
                             {
-                                AssetDatabase.AddObjectToAsset(behaviour, controller);
+                                EnsureSubAsset(behaviour, controller);
                                 SetParamDriverCopy(behaviour, paramName, intParamName, sourceMin + resolution, sourceMax - resolution, 0, maxValue, clearFirst: true);
                                 SetParamDriverCopy(behaviour, intParamName, $"{paramName}_Snapped", 0, maxValue, destMin, destMax, clearFirst: false);
                             }
@@ -377,7 +436,7 @@ namespace Samirin33.NDMF.Components.Editor
                             var behaviour = state.state.AddStateMachineBehaviour(paramDriverType);
                             if (behaviour != null)
                             {
-                                AssetDatabase.AddObjectToAsset(behaviour, controller);
+                                EnsureSubAsset(behaviour, controller);
                                 SetParamDriverCopy(behaviour, intParamName, $"{paramName}_Snapped", 0, maxValue, destMin, destMax, clearFirst: true);
                                 SetParamDriverCopy(behaviour, $"{paramName}_Snapped", paramName, sourceMin, sourceMax, destMin, destMax, clearFirst: false);
                             }
@@ -465,7 +524,7 @@ namespace Samirin33.NDMF.Components.Editor
                         var behaviour = state.AddStateMachineBehaviour(paramDriverType);
                         if (behaviour != null)
                         {
-                            AssetDatabase.AddObjectToAsset(behaviour, controller);
+                            EnsureSubAsset(behaviour, controller);
 
                             var boolValues = new bool[bitCount];
                             for (int b = 0; b < bitCount; b++)

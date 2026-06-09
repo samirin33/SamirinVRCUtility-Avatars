@@ -254,7 +254,7 @@ namespace Samirin33.Editor
         public static void DrawWithBlueBackground(Action drawContent)
         {
             var style = SamirinEditorPreferences.UseCustomBackground ? BlueBackgroundStyle : MinimalBoxStyle;
-            EditorGUILayout.BeginVertical(style);
+            EditorGUILayout.BeginVertical(style, GUILayout.ExpandWidth(true));
             DrawWithBlueBackgroundContent(drawContent);
         }
 
@@ -279,13 +279,11 @@ namespace Samirin33.Editor
 
         /// <summary>
         /// <see cref="UnityEditor.Editor.OnInspectorGUI"/> や <see cref="UnityEditor.SettingsProvider"/>.<c>OnGUI</c> 用。
-        /// <see cref="EditorWindow.position"/> は使えないため、<see cref="EditorGUIUtility.currentViewWidth"/> と十分な高さで塗る。
+        /// インスペクターは親の GUILayout に従う必要があるため、<see cref="GUILayout.BeginArea"/> は使わない。
         /// </summary>
         public static void DrawWithBlueBackgroundForInspectorOrSettings(Action drawContent)
         {
-            float w = EditorGUIUtility.currentViewWidth;
-            if (w < 4f) w = 800f;
-            DrawWithBlueBackground(drawContent, new Rect(0, 0, w, 4000f));
+            DrawWithBlueBackground(drawContent);
         }
 
         /// <summary>
