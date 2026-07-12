@@ -29,5 +29,24 @@ namespace Samirin33.NDMF.Base.Editor
         {
             SamirinEditorStyleHelper.DrawWithDefaultFont(drawAction);
         }
+
+        protected static void DrawSmoothWeightField(
+            SerializedProperty smoothWeightProp,
+            GUIContent label = null)
+        {
+            label ??= new GUIContent("スムージング重み(高いほどゆっくり)");
+
+            if (smoothWeightProp.floatValue >= 1f)
+            {
+                EditorGUILayout.PropertyField(smoothWeightProp, label);
+            }
+            else
+            {
+                EditorGUI.BeginChangeCheck();
+                var newValue = EditorGUILayout.Slider(label, smoothWeightProp.floatValue, 0f, 1f);
+                if (EditorGUI.EndChangeCheck())
+                    smoothWeightProp.floatValue = newValue;
+            }
+        }
     }
 }

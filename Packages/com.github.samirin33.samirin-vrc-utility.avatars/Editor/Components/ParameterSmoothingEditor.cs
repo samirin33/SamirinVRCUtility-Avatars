@@ -68,7 +68,7 @@ namespace Samirin33.NDMF.Components.Editor
                         EditorGUILayout.EndHorizontal();
 
                         EditorGUILayout.PropertyField(parameterNameProp, new GUIContent("パラメータ名"));
-                        EditorGUILayout.Slider(smoothWeightProp, 0.0001f, 0.9999f, new GUIContent("スムージング重み(高いほどゆっくり)"));
+                        DrawSmoothWeightField(smoothWeightProp);
 
                         var paramName = parameterNameProp.stringValue;
                         if (!string.IsNullOrEmpty(paramName))

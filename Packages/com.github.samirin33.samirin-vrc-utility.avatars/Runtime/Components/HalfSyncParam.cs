@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 using Samirin33.NDMF.Base;
 
@@ -20,18 +18,48 @@ namespace Samirin33.NDMF.Components
             public string paramName;
             public ParamType paramType;
             public BitType bitType;
+            public int customBitCount = 8;
 
+            public IntRangePreset intRangePreset = IntRangePreset.FromZero;
+            public FloatRangePreset floatRangePreset = FloatRangePreset.ZeroToPlusOne;
+            public int customIntMin;
+            public float customFloatMin;
+            public float customFloatMax = 1f;
+
+            public DivisionType divisionType = DivisionType.Even;
             public float smoothWeight = 0.2f;
-
-            /// <summary> true の場合、ビルド時に親 Animator 内のこのパラメータ参照をすべて _Smoothed に置換する。 </summary>
-            public bool replaceWithSmoothedInAnimator = true;
         }
 
         public enum ParamType
         {
             Int,
-            FloatZeroToPlusOne,
-            FloatMinusOneToPlusOne,
+            Float,
+        }
+
+        public enum IntRangePreset
+        {
+            [InspectorName("0~2^n")]
+            FromZero,
+            [InspectorName("カスタム")]
+            Custom,
+        }
+
+        public enum FloatRangePreset
+        {
+            [InspectorName("-1~1")]
+            MinusOneToPlusOne,
+            [InspectorName("0~1")]
+            ZeroToPlusOne,
+            [InspectorName("カスタム")]
+            Custom,
+        }
+
+        public enum DivisionType
+        {
+            [InspectorName("偶数分割")]
+            Even,
+            [InspectorName("奇数分割")]
+            Odd,
         }
 
         public enum BitType
@@ -43,55 +71,61 @@ namespace Samirin33.NDMF.Components
             _5bit, //5bitで0-31の値を送信
             _6bit, //6bitで0-63の値を送信
             _7bit, //7bitで0-127の値を送信
+            [InspectorName("カスタム")]
+            Custom,
+        }
+
+        public const int MinCustomBitCount = 1;
+        public const int MaxCustomBitCount = 16;
+
+        public static int GetBitCount(syncParamSetting setting)
+        {
+            if (setting == null) return MinCustomBitCount;
+            if (setting.bitType == BitType.Custom)
+                return Mathf.Clamp(setting.customBitCount, MinCustomBitCount, MaxCustomBitCount);
+
+            switch (setting.bitType)
+            {
+                case BitType._1bit: return 1;
+                case BitType._2bit: return 2;
+                case BitType._3bit: return 3;
+                case BitType._4bit: return 4;
+                case BitType._5bit: return 5;
+                case BitType._6bit: return 6;
+                case BitType._7bit: return 7;
+                default: return 1;
+            }
+        }
+
+        public static int GetIntRangeSpan(syncParamSetting setting)
+        {
+            return 1 << GetBitCount(setting);
+        }
+
+        public static int GetMaxSyncValue(syncParamSetting setting)
+        {
+            return GetIntRangeSpan(setting) - 1;
         }
 
         public syncParamSetting[] syncParamSettings;
 
         public bool writeDefault = false;
 
+        /// <summary> true の場合、ビルド時に親 Animator 内の Float パラメータ参照をすべて _Smoothed に置換する。 </summary>
+        public bool replaceWithSmoothedInAnimator = true;
+
         public override void OnBuildSingle(SamirinBuildPhase buildPhase, bool beforeModularAvatar, SamirinMABaseSingle[] _MAScripts, GameObject avatarRootObject, Action<GameObject, SamirinMABaseSingle[]> invokeBuilder, Action<GameObject, SamirinMABaseSingle[]> invokeReplaceBuilder)
         {
             if (buildPhase == SamirinBuildPhase.Resolving && beforeModularAvatar)
             {
                 invokeBuilder(avatarRootObject, _MAScripts);
-
-                var floatSettings = syncParamSettings.Where(s => IsFloatParamType(s.paramType)).ToArray();
-                if (floatSettings.Length > 0)
-                {
-                    var paramSmoothing = this.gameObject.GetComponent<ParameterSmoothing>();
-                    if (paramSmoothing == null)
-                        paramSmoothing = this.gameObject.AddComponent<ParameterSmoothing>();
-
-                    var newInfos = floatSettings
-                        .Select(s => new ParameterSmoothing.ParameterSmoothingInfo
-                        {
-                            parameterName = string.IsNullOrEmpty(s.paramName) ? $"Param_{s.paramType}{s.bitType}" : s.paramName,
-                            smoothWeight = s.smoothWeight
-                        })
-                        .ToArray();
-
-                    var existing = paramSmoothing.parameterSmoothingData ?? Array.Empty<ParameterSmoothing.ParameterSmoothingInfo>();
-                    var existingNames = new HashSet<string>(existing.Select(x => x.parameterName), StringComparer.Ordinal);
-                    var merged = existing.ToList();
-                    foreach (var info in newInfos)
-                    {
-                        if (existingNames.Add(info.parameterName))
-                            merged.Add(info);
-                    }
-                    paramSmoothing.parameterSmoothingData = merged.ToArray();
-                }
             }
 
             if (buildPhase == SamirinBuildPhase.Optimizing && beforeModularAvatar)
             {
                 invokeReplaceBuilder?.Invoke(avatarRootObject, _MAScripts);
+                DestroyImmediate(this);
             }
-        }
-
-        private static bool IsFloatParamType(HalfSyncParam.ParamType paramType)
-        {
-            return paramType == HalfSyncParam.ParamType.FloatZeroToPlusOne
-                || paramType == HalfSyncParam.ParamType.FloatMinusOneToPlusOne;
         }
     }
 }

@@ -29,22 +29,28 @@ namespace Samirin33.NDMF.Components
             if (buildPhase == SamirinBuildPhase.Resolving && beforeModularAvatar)
             {
                 invokeBuilder(avatarRootObject, _MAScripts);
-
-                var fpsCounterPath = AssetDatabase.GUIDToAssetPath(FPSCounterGUID);
-                var fpsCounter = !string.IsNullOrEmpty(fpsCounterPath)
-                    ? AssetDatabase.LoadAssetAtPath<GameObject>(fpsCounterPath)
-                    : null;
-                if (fpsCounter == null)
-                {
-                    Debug.LogError($"FPSCounter not found (GUID: {FPSCounterGUID}, path: {fpsCounterPath})");
-                    return;
-                }
-
-                var moduleSetter = GetComponent<ModuleSetter>();
-                if (moduleSetter == null) moduleSetter = this.gameObject.AddComponent<ModuleSetter>();
-                moduleSetter.modulePrefabs = new GameObject[] { fpsCounter };
-                Debug.Log("FPSCounter added to module setter");
+                EnsureFPSCounterModule(gameObject);
+                DestroyImmediate(this);
             }
+        }
+
+        public static void EnsureFPSCounterModule(GameObject targetObject)
+        {
+            if (targetObject == null) return;
+
+            var fpsCounterPath = AssetDatabase.GUIDToAssetPath(FPSCounterGUID);
+            var fpsCounter = !string.IsNullOrEmpty(fpsCounterPath)
+                ? AssetDatabase.LoadAssetAtPath<GameObject>(fpsCounterPath)
+                : null;
+            if (fpsCounter == null)
+            {
+                Debug.LogError($"FPSCounter not found (GUID: {FPSCounterGUID}, path: {fpsCounterPath})");
+                return;
+            }
+
+            var moduleSetter = targetObject.GetComponent<ModuleSetter>();
+            if (moduleSetter == null) moduleSetter = targetObject.AddComponent<ModuleSetter>();
+            moduleSetter.modulePrefabs = new GameObject[] { fpsCounter };
         }
         
 #endif

@@ -27,10 +27,15 @@ namespace Samirin33.NDMF.Components.Editor
                 return;
 
             var mergedInfos = MergeParameterSmoothingData(parameterSmoothings);
-            if (mergedInfos.Count == 0)
+            BuildFromInfos(avatarRootObject, mergedInfos.ToArray());
+        }
+
+        public static void BuildFromInfos(GameObject avatarRootObject, ParameterSmoothing.ParameterSmoothingInfo[] infos)
+        {
+            if (avatarRootObject == null || infos == null || infos.Length == 0)
                 return;
 
-            var controller = CreateControllerFromParameterSmoothingData(mergedInfos.ToArray(), out var paramNamesToRegister);
+            var controller = CreateControllerFromParameterSmoothingData(infos, out var paramNamesToRegister);
             if (controller == null)
                 return;
 
@@ -69,8 +74,11 @@ namespace Samirin33.NDMF.Components.Editor
             if (!Directory.Exists(GeneratedFolder))
                 Directory.CreateDirectory(GeneratedFolder);
 
-            var controller = AnimatorController.CreateAnimatorControllerAtPath(
-                $"{GeneratedFolder}/ParameterSmoothing_Generated.controller");
+            var controllerPath = $"{GeneratedFolder}/ParameterSmoothing_Generated.controller";
+            if (AssetDatabase.LoadAssetAtPath<AnimatorController>(controllerPath) != null)
+                AssetDatabase.DeleteAsset(controllerPath);
+
+            var controller = AnimatorController.CreateAnimatorControllerAtPath(controllerPath);
             if (controller == null)
                 return null;
 
@@ -104,7 +112,6 @@ namespace Samirin33.NDMF.Components.Editor
             EditorUtility.SetDirty(controller);
             AssetDatabase.SaveAssets();
 
-            var controllerPath = $"{GeneratedFolder}/ParameterSmoothing_Generated.controller";
             AssetDatabase.ImportAsset(controllerPath, ImportAssetOptions.ForceUpdate);
             UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
 
@@ -199,7 +206,7 @@ namespace Samirin33.NDMF.Components.Editor
             {
                 var paramName = info.parameterName;
                 var fixedWeightParamName = $"{paramName}_FixedSmoothWeight";
-                var inputWeight = info.smoothWeight;
+                var inputWeight = info.smoothWeight * 0.01f;
                 var targetWeight = inputWeight * inputWeight;
 
                 var keyframes = new Keyframe[keyframeCount];

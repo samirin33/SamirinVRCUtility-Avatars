@@ -28,6 +28,8 @@ namespace Samirin33.NDMF.Components
                 {
                     gameObject.SetActive(resetObjectEnable);
                 }
+
+                DestroyImmediate(this);
             }
             else if (buildPhase == SamirinBuildPhase.Resolving && beforeModularAvatar)
             {

@@ -24,16 +24,8 @@ namespace Samirin33.NDMF.Components.Editor
         private const string EmptyMotionGUID = "4de039275b65be24c8f0a641d7a44924";
         private static string GeneratedFolder => "Assets/Generated/SamirinVRCUtility/HalfSyncParam";
 
-        private static readonly Dictionary<HalfSyncParam.BitType, int> BitCountMap = new Dictionary<HalfSyncParam.BitType, int>
-        {
-            { HalfSyncParam.BitType._1bit, 1 },
-            { HalfSyncParam.BitType._2bit, 2 },
-            { HalfSyncParam.BitType._3bit, 3 },
-            { HalfSyncParam.BitType._4bit, 4 },
-            { HalfSyncParam.BitType._5bit, 5 },
-            { HalfSyncParam.BitType._6bit, 6 },
-            { HalfSyncParam.BitType._7bit, 7 },
-        };
+        private static int GetBitCount(HalfSyncParam.syncParamSetting setting)
+            => HalfSyncParam.GetBitCount(setting);
 
         public static void Build(GameObject avatarRootObject, params HalfSyncParam[] halfSyncParams)
         {
@@ -49,6 +41,53 @@ namespace Samirin33.NDMF.Components.Editor
                 return;
 
             AddModularAvatarModule(avatarRootObject, controller, paramNamesToRegister);
+
+            var smoothingInfos = ExtractFloatSmoothingInfos(halfSyncParams);
+            if (smoothingInfos.Count > 0)
+            {
+                ParameterSmoothingBuilder.BuildFromInfos(avatarRootObject, smoothingInfos.ToArray());
+                foreach (var component in halfSyncParams)
+                {
+                    if (component == null || !HasFloatSettings(component)) continue;
+                    ParameterSmoothing.EnsureFPSCounterModule(component.gameObject);
+                }
+            }
+        }
+
+        private static bool HasFloatSettings(HalfSyncParam halfSyncParam)
+        {
+            if (halfSyncParam.syncParamSettings == null) return false;
+            return halfSyncParam.syncParamSettings.Any(s => s.paramType == HalfSyncParam.ParamType.Float);
+        }
+
+        private static List<ParameterSmoothing.ParameterSmoothingInfo> ExtractFloatSmoothingInfos(HalfSyncParam[] halfSyncParams)
+        {
+            var processedParamNames = new HashSet<string>(StringComparer.Ordinal);
+            var infos = new List<ParameterSmoothing.ParameterSmoothingInfo>();
+
+            foreach (var component in halfSyncParams)
+            {
+                if (component?.syncParamSettings == null) continue;
+
+                foreach (var setting in component.syncParamSettings)
+                {
+                    if (setting.paramType != HalfSyncParam.ParamType.Float) continue;
+
+                    var paramName = string.IsNullOrEmpty(setting.paramName)
+                        ? $"Param_{setting.paramType}{setting.bitType}"
+                        : setting.paramName;
+
+                    if (!processedParamNames.Add(paramName)) continue;
+
+                    infos.Add(new ParameterSmoothing.ParameterSmoothingInfo
+                    {
+                        parameterName = paramName,
+                        smoothWeight = setting.smoothWeight
+                    });
+                }
+            }
+
+            return infos;
         }
 
         /// <summary>
@@ -65,24 +104,30 @@ namespace Samirin33.NDMF.Components.Editor
             if (avatarRootObject == null || halfSyncParams == null || halfSyncParams.Length == 0)
                 return;
 
-            var (mergedList, _) = MergeSettingsFromModule(halfSyncParams);
-            var toReplace = mergedList
-                .Where(s => IsFloatParamType(s.paramType) && s.replaceWithSmoothedInAnimator)
-                .ToList();
-            if (toReplace.Count == 0) return;
-
             var fxController = VRCAvatarDescriptorControllerUtility.GetController(
                 avatarRootObject,
                 VRCAvatarDescriptor.AnimLayerType.FX);
             if (fxController == null) return;
 
-            foreach (var setting in toReplace)
+            var processedParamNames = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var component in halfSyncParams)
             {
-                var paramName = string.IsNullOrEmpty(setting.paramName)
-                    ? $"Param_{setting.paramType}{setting.bitType}"
-                    : setting.paramName;
-                var smoothedName = $"{paramName}_Smoothed";
-                AnimatorParameterReplaceUtility.ReplaceParameterReferences(fxController, paramName, smoothedName, DefaultExcludedLayerNames);
+                if (component == null || !component.replaceWithSmoothedInAnimator) continue;
+                if (component.syncParamSettings == null) continue;
+
+                foreach (var setting in component.syncParamSettings)
+                {
+                    if (setting.paramType != HalfSyncParam.ParamType.Float) continue;
+
+                    var paramName = string.IsNullOrEmpty(setting.paramName)
+                        ? $"Param_{setting.paramType}{setting.bitType}"
+                        : setting.paramName;
+
+                    if (!processedParamNames.Add(paramName)) continue;
+
+                    var smoothedName = $"{paramName}_Smoothed";
+                    AnimatorParameterReplaceUtility.ReplaceParameterReferences(fxController, paramName, smoothedName, DefaultExcludedLayerNames);
+                }
             }
         }
 
@@ -99,7 +144,7 @@ namespace Samirin33.NDMF.Components.Editor
 
                 foreach (var setting in component.syncParamSettings)
                 {
-                    if (!BitCountMap.ContainsKey(setting.bitType)) continue;
+                    if (GetBitCount(setting) < 1) continue;
 
                     var paramName = string.IsNullOrEmpty(setting.paramName)
                         ? $"Param_{setting.paramType}{setting.bitType}"
@@ -149,17 +194,21 @@ namespace Samirin33.NDMF.Components.Editor
 
             foreach (var setting in settings)
             {
-                var bitCount = BitCountMap[setting.bitType];
+                var bitCount = GetBitCount(setting);
                 var paramName = string.IsNullOrEmpty(setting.paramName) ? $"Param_{setting.paramType}{setting.bitType}" : setting.paramName;
                 var maxValue = (1 << bitCount) - 1;
-                var isFloat = IsFloatParamType(setting.paramType);
-                var intParamName = isFloat ? $"{paramName}_Int" : paramName;
+                var isFloat = setting.paramType == HalfSyncParam.ParamType.Float;
+                var intParamName = $"{paramName}_Int";
 
                 if (isFloat)
                 {
                     controller.AddParameter(paramName, AnimatorControllerParameterType.Float);
                     controller.AddParameter($"{paramName}_Snapped", AnimatorControllerParameterType.Float);
                     controller.AddParameter($"{paramName}_Smoothed", AnimatorControllerParameterType.Float);
+                }
+                else
+                {
+                    controller.AddParameter(paramName, AnimatorControllerParameterType.Int);
                 }
                 controller.AddParameter(intParamName, AnimatorControllerParameterType.Int);
                 for (int i = 0; i < bitCount; i++)
@@ -175,7 +224,7 @@ namespace Samirin33.NDMF.Components.Editor
 
             controller.RemoveLayer(0);
 
-            if (settings.Any(s => IsFloatParamType(s.paramType)))
+            if (settings.Length > 0)
             {
                 controller.AddParameter(new AnimatorControllerParameter
                 {
@@ -184,9 +233,9 @@ namespace Samirin33.NDMF.Components.Editor
                     defaultBool = true
                 });
 
-                var floatLayer = CreateFloatConvertLayer(settings, writeDefault);
-                if (floatLayer != null)
-                    controller.AddLayer(floatLayer);
+                var rangeLayer = CreateRangeConvertLayer(settings, writeDefault);
+                if (rangeLayer != null)
+                    controller.AddLayer(rangeLayer);
             }
 
             foreach (var (layer, _, _, _, _, _) in layersToAdd)
@@ -197,7 +246,7 @@ namespace Samirin33.NDMF.Components.Editor
             foreach (var (_, _, intParamName, bitCount, maxValue, _) in layersToAdd)
                 AddParamDriverBehaviours(controller, intParamName, bitCount, maxValue, paramDriverType);
 
-            AddFloatConvertParamDrivers(controller, settings, paramDriverType);
+            AddRangeConvertParamDrivers(controller, settings, paramDriverType);
 
             EditorUtility.SetDirty(controller);
             AssetDatabase.SaveAssets();
@@ -333,13 +382,12 @@ namespace Samirin33.NDMF.Components.Editor
             return layer;
         }
 
-        private static AnimatorControllerLayer CreateFloatConvertLayer(HalfSyncParam.syncParamSetting[] settings, bool writeDefault)
+        private static AnimatorControllerLayer CreateRangeConvertLayer(HalfSyncParam.syncParamSetting[] settings, bool writeDefault)
         {
-            var floatSettings = settings.Where(s => IsFloatParamType(s.paramType)).ToArray();
-            if (floatSettings.Length == 0) return null;
+            if (settings.Length == 0) return null;
 
             var emptyMotion = LoadEmptyMotion();
-            var rootSm = new AnimatorStateMachine { name = "FloatConvert" };
+            var rootSm = new AnimatorStateMachine { name = "RangeConvert" };
 
             var brunchState = rootSm.AddState("Brunch", new Vector3(300, 120, 0));
             brunchState.motion = emptyMotion;
@@ -383,62 +431,71 @@ namespace Samirin33.NDMF.Components.Editor
 
             return new AnimatorControllerLayer
             {
-                name = "FloatConvert",
+                name = "RangeConvert",
                 defaultWeight = 1f,
                 stateMachine = rootSm
             };
         }
 
-        private static void AddFloatConvertParamDrivers(AnimatorController controller, HalfSyncParam.syncParamSetting[] settings,
+        private static void AddRangeConvertParamDrivers(AnimatorController controller, HalfSyncParam.syncParamSetting[] settings,
             Type paramDriverType)
         {
-            var floatSettings = settings.Where(s => IsFloatParamType(s.paramType)).ToArray();
-            if (floatSettings.Length == 0 || paramDriverType == null) return;
+            if (settings.Length == 0 || paramDriverType == null) return;
 
             foreach (var layer in controller.layers)
             {
-                if (layer.name != "FloatConvert") continue;
+                if (layer.name != "RangeConvert") continue;
 
                 foreach (var state in layer.stateMachine.states)
                 {
                     var stateName = state.state.name;
                     if (stateName == "Local")
                     {
-                        foreach (var setting in floatSettings)
+                        foreach (var setting in settings)
                         {
-                            var bitCount = BitCountMap[setting.bitType];
+                            var bitCount = GetBitCount(setting);
                             var maxValue = (1 << bitCount) - 1;
-                            var resolution = 1f / maxValue;
-                            var paramName = string.IsNullOrEmpty(setting.paramName) ? $"Param_{setting.paramType}{setting.bitType}" : setting.paramName;
+                            var paramName = GetParamName(setting);
                             var intParamName = $"{paramName}_Int";
-                            var (sourceMin, sourceMax, destMin, destMax) = GetFloatConvertRanges(setting.paramType, maxValue);
+                            var (inputMin, inputMax, syncMin, syncMax) = GetInputToSyncRanges(setting, maxValue);
 
                             var behaviour = state.state.AddStateMachineBehaviour(paramDriverType);
-                            if (behaviour != null)
+                            if (behaviour == null) continue;
+
+                            EnsureSubAsset(behaviour, controller);
+                            SetParamDriverCopy(behaviour, paramName, intParamName, inputMin, inputMax, syncMin, syncMax, clearFirst: true);
+
+                            if (setting.paramType == HalfSyncParam.ParamType.Float)
                             {
-                                EnsureSubAsset(behaviour, controller);
-                                SetParamDriverCopy(behaviour, paramName, intParamName, sourceMin + resolution, sourceMax - resolution, 0, maxValue, clearFirst: true);
-                                SetParamDriverCopy(behaviour, intParamName, $"{paramName}_Snapped", 0, maxValue, destMin, destMax, clearFirst: false);
+                                var (destMin, destMax, sourceMin, sourceMax) = GetSyncToOutputRanges(setting, maxValue);
+                                SetParamDriverCopy(behaviour, intParamName, $"{paramName}_Snapped", sourceMin, sourceMax, destMin, destMax, clearFirst: false);
                             }
                         }
                     }
                     else if (stateName == "Remote")
                     {
-                        foreach (var setting in floatSettings)
+                        foreach (var setting in settings)
                         {
-                            var bitCount = BitCountMap[setting.bitType];
+                            var bitCount = GetBitCount(setting);
                             var maxValue = (1 << bitCount) - 1;
-                            var resolution = 1f / maxValue;
-                            var paramName = string.IsNullOrEmpty(setting.paramName) ? $"Param_{setting.paramType}{setting.bitType}" : setting.paramName;
+                            var paramName = GetParamName(setting);
                             var intParamName = $"{paramName}_Int";
-                            var (sourceMin, sourceMax, destMin, destMax) = GetFloatConvertRanges(setting.paramType, maxValue);
+                            var (outputMin, outputMax) = GetSourceRange(setting);
+                            var (destMin, destMax, sourceMin, sourceMax) = GetSyncToOutputRanges(setting, maxValue);
 
                             var behaviour = state.state.AddStateMachineBehaviour(paramDriverType);
-                            if (behaviour != null)
+                            if (behaviour == null) continue;
+
+                            EnsureSubAsset(behaviour, controller);
+
+                            if (setting.paramType == HalfSyncParam.ParamType.Float)
                             {
-                                EnsureSubAsset(behaviour, controller);
-                                SetParamDriverCopy(behaviour, intParamName, $"{paramName}_Snapped", 0, maxValue, destMin, destMax, clearFirst: true);
-                                SetParamDriverCopy(behaviour, $"{paramName}_Snapped", paramName, sourceMin, sourceMax, destMin, destMax, clearFirst: false);
+                                SetParamDriverCopy(behaviour, intParamName, $"{paramName}_Snapped", sourceMin, sourceMax, destMin, destMax, clearFirst: true);
+                                SetParamDriverCopy(behaviour, $"{paramName}_Snapped", paramName, destMin, destMax, outputMin, outputMax, clearFirst: false);
+                            }
+                            else
+                            {
+                                SetParamDriverCopy(behaviour, intParamName, paramName, sourceMin, sourceMax, outputMin, outputMax, clearFirst: true);
                             }
                         }
                     }
@@ -446,24 +503,87 @@ namespace Samirin33.NDMF.Components.Editor
             }
         }
 
-        private static bool IsFloatParamType(HalfSyncParam.ParamType paramType)
+        private static string GetParamName(HalfSyncParam.syncParamSetting setting)
         {
-            return paramType == HalfSyncParam.ParamType.FloatZeroToPlusOne
-                || paramType == HalfSyncParam.ParamType.FloatMinusOneToPlusOne;
+            return string.IsNullOrEmpty(setting.paramName)
+                ? $"Param_{setting.paramType}{setting.bitType}"
+                : setting.paramName;
         }
 
-        private static (float sourceMin, float sourceMax, float destMin, float destMax) GetFloatConvertRanges(
-            HalfSyncParam.ParamType paramType, int maxValue)
+        private static (float min, float max) GetSourceRange(HalfSyncParam.syncParamSetting setting)
         {
-            switch (paramType)
+            if (setting.paramType == HalfSyncParam.ParamType.Float)
             {
-                case HalfSyncParam.ParamType.FloatZeroToPlusOne:
-                    return (0f, 1f, 0f, 1f);
-                case HalfSyncParam.ParamType.FloatMinusOneToPlusOne:
-                    return (-1f, 1f, -1f, 1f);
-                default:
-                    return (0f, 1f, 0f, 1f);
+                switch (setting.floatRangePreset)
+                {
+                    case HalfSyncParam.FloatRangePreset.MinusOneToPlusOne:
+                        return (-1f, 1f);
+                    case HalfSyncParam.FloatRangePreset.ZeroToPlusOne:
+                        return (0f, 1f);
+                    case HalfSyncParam.FloatRangePreset.Custom:
+                        return GetFloatCustomRange(setting.customFloatMin, setting.customFloatMax);
+                }
             }
+            else
+            {
+                return GetIntSourceRange(setting);
+            }
+
+            return (0f, 1f);
+        }
+
+        private static (float min, float max) GetIntSourceRange(HalfSyncParam.syncParamSetting setting)
+        {
+            var span = HalfSyncParam.GetIntRangeSpan(setting);
+            var min = setting.intRangePreset == HalfSyncParam.IntRangePreset.FromZero
+                ? 0
+                : setting.customIntMin;
+            return (min, min + span - 1);
+        }
+
+        private static (float min, float max) GetFloatCustomRange(float min, float max)
+        {
+            if (min >= max)
+                max = min + 0.0001f;
+            return (min, max);
+        }
+
+        /// <summary>
+        /// ユーザー入力レンジから同期用 Int レンジへの変換範囲。
+        /// </summary>
+        private static (float inputMin, float inputMax, float syncMin, float syncMax) GetInputToSyncRanges(
+            HalfSyncParam.syncParamSetting setting, int maxValue)
+        {
+            var (rangeMin, rangeMax) = GetSourceRange(setting);
+            if (setting.paramType == HalfSyncParam.ParamType.Int)
+                return (rangeMin, rangeMax, 0f, maxValue);
+
+            if (setting.divisionType == HalfSyncParam.DivisionType.Odd)
+            {
+                var step = (rangeMax - rangeMin) / (maxValue + 1f);
+                return (rangeMin + step * 0.5f, rangeMax - step * 0.5f, 0f, maxValue);
+            }
+
+            return (rangeMin, rangeMax, 0f, maxValue);
+        }
+
+        /// <summary>
+        /// 同期用 Int レンジから出力レンジへの変換範囲。
+        /// </summary>
+        private static (float destMin, float destMax, float sourceMin, float sourceMax) GetSyncToOutputRanges(
+            HalfSyncParam.syncParamSetting setting, int maxValue)
+        {
+            var (rangeMin, rangeMax) = GetSourceRange(setting);
+            if (setting.paramType == HalfSyncParam.ParamType.Int)
+                return (rangeMin, rangeMax, 0f, maxValue);
+
+            if (setting.divisionType == HalfSyncParam.DivisionType.Odd)
+            {
+                var step = (rangeMax - rangeMin) / (maxValue + 1f);
+                return (rangeMin + step * 0.5f, rangeMax - step * 0.5f, 0f, maxValue);
+            }
+
+            return (rangeMin, rangeMax, 0f, maxValue);
         }
 
         private static void SetParamDriverCopy(StateMachineBehaviour behaviour, string sourceName, string destName, float sourceMin, float sourceMax, float destMin, float destMax, bool clearFirst = true)

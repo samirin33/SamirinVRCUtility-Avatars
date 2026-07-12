@@ -27,7 +27,11 @@ namespace Samirin33.NDMF.Components
             if (buildPhase != SamirinBuildPhase.Resolving || !beforeModularAvatar) return;
 #if UNITY_EDITOR
             var sourceTransform = GetWorldPrefabTransform();
-            if (sourceTransform == null) return;
+            if (sourceTransform == null)
+            {
+                DestroyImmediate(this);
+                return;
+            }
 
             var target = gameObject;
 
@@ -63,6 +67,8 @@ namespace Samirin33.NDMF.Components
                 SetScaleConstraintAxes(constraint);
                 AddSourceIfNeeded(constraint, sourceTransform);
             }
+
+            DestroyImmediate(this);
 #endif
         }
 

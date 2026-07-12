@@ -1,11 +1,11 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using VRC.SDKBase;
+using Samirin33.NDMF.Base;
 
 namespace Samirin33.NDMF.Module
 {
-    public class ModuleParamInfo : MonoBehaviour, IEditorOnly
+    public class ModuleParamInfo : SamirinMABase
     {
         [System.Serializable]
         public class ParamInfo
@@ -29,6 +29,14 @@ namespace Samirin33.NDMF.Module
         private void Reset()
         {
             animator = GetComponent<Animator>();
+        }
+
+        public override void OnBuild(SamirinBuildPhase buildPhase, bool beforeModularAvatar, GameObject avatarRootObject)
+        {
+            if (buildPhase == SamirinBuildPhase.Transforming && beforeModularAvatar)
+            {
+                DestroyImmediate(this);
+            }
         }
     }
 }
