@@ -1,10 +1,6 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using Samirin33.NDMF.Base;
-using Samirin33.NDMF.Module;
-using UnityEditor;
 
 namespace Samirin33.NDMF.Components
 {
@@ -15,44 +11,35 @@ namespace Samirin33.NDMF.Components
         public class ParameterSmoothingInfo
         {
             public string parameterName;
+            /// <summary>
+            /// true の場合は親の defaultSmoothWeight を使用する。
+            /// </summary>
+            public bool useDefaultSmoothWeight = true;
             public float smoothWeight;
+            /// <summary>
+            /// 空の場合は parameterName + "_Smoothed" を使用。
+            /// HalfSyncParam 連携時は元パラメータ名の _Smoothed を指定する。
+            /// </summary>
+            public string smoothedParameterName;
+
+            public float GetEffectiveSmoothWeight(float defaultWeight)
+                => useDefaultSmoothWeight ? defaultWeight : smoothWeight;
         }
 
+        /// <summary>
+        /// リスト上部のデフォルト重み。useDefaultSmoothWeight が true の要素で使用する。
+        /// </summary>
+        public float defaultSmoothWeight = 0.2f;
+
         public ParameterSmoothingInfo[] parameterSmoothingData;
-
-        const string FPSCounterGUID = "9b06db4aacbe94745a2bcd84f67103eb";
-
-#if UNITY_EDITOR
 
         public override void OnBuildSingle(SamirinBuildPhase buildPhase, bool beforeModularAvatar, SamirinMABaseSingle[] _MAScripts, GameObject avatarRootObject, Action<GameObject, SamirinMABaseSingle[]> invokeBuilder, Action<GameObject, SamirinMABaseSingle[]> invokeReplaceBuilder)
         {
             if (buildPhase == SamirinBuildPhase.Resolving && beforeModularAvatar)
             {
                 invokeBuilder(avatarRootObject, _MAScripts);
-                EnsureFPSCounterModule(gameObject);
                 DestroyImmediate(this);
             }
         }
-
-        public static void EnsureFPSCounterModule(GameObject targetObject)
-        {
-            if (targetObject == null) return;
-
-            var fpsCounterPath = AssetDatabase.GUIDToAssetPath(FPSCounterGUID);
-            var fpsCounter = !string.IsNullOrEmpty(fpsCounterPath)
-                ? AssetDatabase.LoadAssetAtPath<GameObject>(fpsCounterPath)
-                : null;
-            if (fpsCounter == null)
-            {
-                Debug.LogError($"FPSCounter not found (GUID: {FPSCounterGUID}, path: {fpsCounterPath})");
-                return;
-            }
-
-            var moduleSetter = targetObject.GetComponent<ModuleSetter>();
-            if (moduleSetter == null) moduleSetter = targetObject.AddComponent<ModuleSetter>();
-            moduleSetter.modulePrefabs = new GameObject[] { fpsCounter };
-        }
-        
-#endif
     }
 }

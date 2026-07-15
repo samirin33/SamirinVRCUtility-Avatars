@@ -8,10 +8,12 @@ namespace Samirin33.NDMF.Components.Editor
     [CanEditMultipleObjects]
     public class ParameterSmoothingEditor : SamirinMABaseEditor
     {
+        private SerializedProperty _defaultSmoothWeight;
         private SerializedProperty _parameterSmoothingData;
 
         private void OnEnable()
         {
+            _defaultSmoothWeight = serializedObject.FindProperty("defaultSmoothWeight");
             _parameterSmoothingData = serializedObject.FindProperty("parameterSmoothingData");
         }
 
@@ -27,12 +29,19 @@ namespace Samirin33.NDMF.Components.Editor
 
                 EditorGUILayout.LabelField("パラメータスムージング設定");
                 EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+
+                if (_defaultSmoothWeight != null)
+                    DrawSmoothWeightField(_defaultSmoothWeight, new GUIContent("デフォルトの重み"));
+
+                EditorGUILayout.Space(4);
+
                 if (_parameterSmoothingData != null)
                 {
                     for (int i = 0; i < _parameterSmoothingData.arraySize; i++)
                     {
                         var element = _parameterSmoothingData.GetArrayElementAtIndex(i);
                         var parameterNameProp = element.FindPropertyRelative("parameterName");
+                        var useDefaultProp = element.FindPropertyRelative("useDefaultSmoothWeight");
                         var smoothWeightProp = element.FindPropertyRelative("smoothWeight");
 
                         EditorGUILayout.BeginVertical(EditorStyles.helpBox, GUILayout.ExpandWidth(true));
@@ -68,13 +77,26 @@ namespace Samirin33.NDMF.Components.Editor
                         EditorGUILayout.EndHorizontal();
 
                         EditorGUILayout.PropertyField(parameterNameProp, new GUIContent("パラメータ名"));
-                        DrawSmoothWeightField(smoothWeightProp);
+
+                        if (useDefaultProp != null)
+                        {
+                            EditorGUI.BeginChangeCheck();
+                            EditorGUILayout.PropertyField(useDefaultProp, new GUIContent("デフォルトの設定値を使う"));
+                            if (EditorGUI.EndChangeCheck() && !useDefaultProp.boolValue && _defaultSmoothWeight != null)
+                                smoothWeightProp.floatValue = _defaultSmoothWeight.floatValue;
+
+                            if (!useDefaultProp.boolValue)
+                                DrawSmoothWeightField(smoothWeightProp);
+                        }
+                        else
+                        {
+                            DrawSmoothWeightField(smoothWeightProp);
+                        }
 
                         var paramName = parameterNameProp.stringValue;
                         if (!string.IsNullOrEmpty(paramName))
                         {
                             var smoothedName = $"{paramName}_Smoothed";
-                            var fixedWeightName = $"{paramName}_FixedSmoothWeight";
 
                             EditorGUILayout.HelpBox(
                                 "以下のパラメータが出力されます。",
@@ -94,6 +116,19 @@ namespace Samirin33.NDMF.Components.Editor
                     if (GUILayout.Button("+ 追加"))
                     {
                         _parameterSmoothingData.arraySize++;
+                        var newElement = _parameterSmoothingData.GetArrayElementAtIndex(_parameterSmoothingData.arraySize - 1);
+                        var useDefaultProp = newElement.FindPropertyRelative("useDefaultSmoothWeight");
+                        if (useDefaultProp != null)
+                            useDefaultProp.boolValue = true;
+                        var smoothWeightProp = newElement.FindPropertyRelative("smoothWeight");
+                        if (smoothWeightProp != null && _defaultSmoothWeight != null)
+                            smoothWeightProp.floatValue = _defaultSmoothWeight.floatValue;
+                        var parameterNameProp = newElement.FindPropertyRelative("parameterName");
+                        if (parameterNameProp != null)
+                            parameterNameProp.stringValue = "";
+                        var smoothedNameProp = newElement.FindPropertyRelative("smoothedParameterName");
+                        if (smoothedNameProp != null)
+                            smoothedNameProp.stringValue = "";
                     }
                 }
                 EditorGUILayout.EndVertical();

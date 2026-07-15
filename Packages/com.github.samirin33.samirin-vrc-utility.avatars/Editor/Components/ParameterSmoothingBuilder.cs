@@ -7,6 +7,8 @@ using UnityEditor.Animations;
 using UnityEngine;
 using nadena.dev.modular_avatar.core;
 using Samirin33.NDMF.Base.Plugin;
+using Samirin33.NDMF.Components;
+using Samirin33.NDMF.Module;
 
 namespace Samirin33.NDMF.Components.Editor
 {
@@ -19,6 +21,7 @@ namespace Samirin33.NDMF.Components.Editor
         }
 
         private const string EmptyMotionGUID = "4de039275b65be24c8f0a641d7a44924";
+        private const string FPSCounterGUID = "9b06db4aacbe94745a2bcd84f67103eb";
         private static string GeneratedFolder => "Assets/Generated/SamirinVRCUtility/ParameterSmoothing";
 
         public static void Build(GameObject avatarRootObject, params ParameterSmoothing[] parameterSmoothings)
@@ -26,20 +29,89 @@ namespace Samirin33.NDMF.Components.Editor
             if (parameterSmoothings == null || parameterSmoothings.Length == 0)
                 return;
 
-            var mergedInfos = MergeParameterSmoothingData(parameterSmoothings);
-            BuildFromInfos(avatarRootObject, mergedInfos.ToArray());
+            var standaloneComponents = parameterSmoothings
+                .Where(c => c != null && !IsHandledByHalfSyncParam(c))
+                .ToArray();
+            if (standaloneComponents.Length == 0)
+                return;
+
+            var mergedInfos = MergeParameterSmoothingData(standaloneComponents);
+            if (mergedInfos.Count == 0)
+                return;
+
+            var moduleParent = standaloneComponents.FirstOrDefault()?.gameObject;
+            BuildFromInfos(avatarRootObject, mergedInfos.ToArray(), moduleParent);
+
+            foreach (var component in standaloneComponents)
+                EnsureFPSCounterModule(component.gameObject);
         }
 
-        public static void BuildFromInfos(GameObject avatarRootObject, ParameterSmoothing.ParameterSmoothingInfo[] infos)
+        private static bool IsHandledByHalfSyncParam(ParameterSmoothing component)
+        {
+            var halfSyncParam = component.GetComponent<HalfSyncParam>();
+            if (halfSyncParam?.syncParamSettings == null)
+                return false;
+
+            return halfSyncParam.syncParamSettings.Any(s => s.paramType == HalfSyncParam.ParamType.Float);
+        }
+
+        public static void EnsureFPSCounterModule(GameObject targetObject)
+        {
+            if (targetObject == null) return;
+
+            var fpsCounterPath = AssetDatabase.GUIDToAssetPath(FPSCounterGUID);
+            var fpsCounter = !string.IsNullOrEmpty(fpsCounterPath)
+                ? AssetDatabase.LoadAssetAtPath<GameObject>(fpsCounterPath)
+                : null;
+            if (fpsCounter == null)
+            {
+                Debug.LogError($"[ParameterSmoothing] FPSCounter not found (GUID: {FPSCounterGUID}, path: {fpsCounterPath})");
+                return;
+            }
+
+            var moduleSetter = targetObject.GetComponent<ModuleSetter>();
+            if (moduleSetter == null)
+                moduleSetter = targetObject.AddComponent<ModuleSetter>();
+            moduleSetter.modulePrefabs = new[] { fpsCounter };
+            EditorUtility.SetDirty(targetObject);
+        }
+
+        private const string HalfSyncSmoothingModuleName = "HalfSyncParam_Smoothing_Module";
+        private const string StandaloneSmoothingModuleName = "ParameterSmoothing_Module";
+
+        public static void BuildFromHalfSyncParam(GameObject avatarRootObject,
+            ParameterSmoothing.ParameterSmoothingInfo[] infos, GameObject moduleParent)
+        {
+            BuildFromInfos(avatarRootObject, infos, moduleParent, HalfSyncSmoothingModuleName, fromHalfSyncParam: true);
+        }
+
+        public static void BuildFromInfos(GameObject avatarRootObject, ParameterSmoothing.ParameterSmoothingInfo[] infos,
+            GameObject moduleParent = null, string moduleObjectName = StandaloneSmoothingModuleName,
+            bool fromHalfSyncParam = false)
         {
             if (avatarRootObject == null || infos == null || infos.Length == 0)
                 return;
 
-            var controller = CreateControllerFromParameterSmoothingData(infos, out var paramNamesToRegister);
+            var controller = CreateControllerFromParameterSmoothingData(infos, out var paramNamesToRegister, fromHalfSyncParam);
             if (controller == null)
+            {
+                Debug.LogError("[ParameterSmoothing] Animator Controller の生成に失敗しました。MA Merge Animator は登録されません。");
                 return;
+            }
 
-            AddModularAvatarModule(avatarRootObject, controller, paramNamesToRegister);
+            AddModularAvatarModule(moduleParent ?? avatarRootObject, controller, paramNamesToRegister, moduleObjectName);
+        }
+
+        private static string GetSmoothedParamName(ParameterSmoothing.ParameterSmoothingInfo info)
+            => string.IsNullOrEmpty(info.smoothedParameterName) ? $"{info.parameterName}_Smoothed" : info.smoothedParameterName;
+
+        /// <summary>
+        /// 同じ SmoothWeight 値は同一の FixedSmoothWeight パラメーターを共有する。
+        /// </summary>
+        private static string GetFixedWeightParamName(float smoothWeight)
+        {
+            var rounded = Mathf.Round(smoothWeight * 1_000_000f) / 1_000_000f;
+            return $"FixedSmoothWeight_{rounded:0.######}";
         }
 
         private static List<ParameterSmoothing.ParameterSmoothingInfo> MergeParameterSmoothingData(
@@ -58,7 +130,13 @@ namespace Samirin33.NDMF.Components.Editor
                     if (processedParamNames.Contains(info.parameterName)) continue;
 
                     processedParamNames.Add(info.parameterName);
-                    merged.Add(info);
+                    merged.Add(new ParameterSmoothing.ParameterSmoothingInfo
+                    {
+                        parameterName = info.parameterName,
+                        useDefaultSmoothWeight = false,
+                        smoothWeight = info.GetEffectiveSmoothWeight(component.defaultSmoothWeight),
+                        smoothedParameterName = info.smoothedParameterName
+                    });
                 }
             }
 
@@ -67,14 +145,17 @@ namespace Samirin33.NDMF.Components.Editor
 
         private static AnimatorController CreateControllerFromParameterSmoothingData(
             ParameterSmoothing.ParameterSmoothingInfo[] infos,
-            out List<(string name, ParameterSyncType syncType)> paramNamesToRegister)
+            out List<(string name, ParameterSyncType syncType)> paramNamesToRegister,
+            bool fromHalfSyncParam = false)
         {
             paramNamesToRegister = new List<(string, ParameterSyncType)>();
 
             if (!Directory.Exists(GeneratedFolder))
                 Directory.CreateDirectory(GeneratedFolder);
 
-            var controllerPath = $"{GeneratedFolder}/ParameterSmoothing_Generated.controller";
+            var controllerPath = fromHalfSyncParam
+                ? $"{GeneratedFolder}/HalfSyncParam_Smoothing_Generated.controller"
+                : $"{GeneratedFolder}/ParameterSmoothing_Generated.controller";
             if (AssetDatabase.LoadAssetAtPath<AnimatorController>(controllerPath) != null)
                 AssetDatabase.DeleteAsset(controllerPath);
 
@@ -82,7 +163,6 @@ namespace Samirin33.NDMF.Components.Editor
             if (controller == null)
                 return null;
 
-            // パラメータ追加: ConstOne, FPS/Value, 各パラメータ用 (param, param_Smoothed, param_FixedSmoothWeight)
             controller.AddParameter(new AnimatorControllerParameter
             {
                 name = "ConstOne",
@@ -92,30 +172,44 @@ namespace Samirin33.NDMF.Components.Editor
             controller.AddParameter("FPS/Value", AnimatorControllerParameterType.Float);
             paramNamesToRegister.Add(("FPS/Value", ParameterSyncType.Float));
 
+            var addedFixedWeightParams = new HashSet<string>(StringComparer.Ordinal);
+
             foreach (var info in infos)
             {
                 var paramName = info.parameterName;
+                var smoothedParamName = GetSmoothedParamName(info);
+                var fixedWeightParamName = GetFixedWeightParamName(info.smoothWeight);
+
                 controller.AddParameter(paramName, AnimatorControllerParameterType.Float);
-                controller.AddParameter($"{paramName}_Smoothed", AnimatorControllerParameterType.Float);
-                controller.AddParameter($"{paramName}_FixedSmoothWeight", AnimatorControllerParameterType.Float);
-                paramNamesToRegister.Add((paramName, ParameterSyncType.Float));
-                paramNamesToRegister.Add(($"{paramName}_Smoothed", ParameterSyncType.Float));
-                paramNamesToRegister.Add(($"{paramName}_FixedSmoothWeight", ParameterSyncType.Float));
+                controller.AddParameter(smoothedParamName, AnimatorControllerParameterType.Float);
+
+                if (addedFixedWeightParams.Add(fixedWeightParamName))
+                    controller.AddParameter(fixedWeightParamName, AnimatorControllerParameterType.Float);
+
+                if (!fromHalfSyncParam)
+                {
+                    paramNamesToRegister.Add((paramName, ParameterSyncType.Float));
+                    paramNamesToRegister.Add((smoothedParamName, ParameterSyncType.Float));
+                }
+            }
+
+            if (!fromHalfSyncParam)
+            {
+                foreach (var fixedWeightParamName in addedFixedWeightParams)
+                    paramNamesToRegister.Add((fixedWeightParamName, ParameterSyncType.Float));
             }
 
             controller.RemoveLayer(0);
 
-            // ParameterSmoothing レイヤー (ParamSmooth.controller の構造)
             var layer = CreateParameterSmoothingLayer(infos, controller);
             controller.AddLayer(layer);
 
-            EditorUtility.SetDirty(controller);
-            AssetDatabase.SaveAssets();
+            AnimatorControllerAssetUtility.RegisterControllerHierarchy(controller);
 
-            AssetDatabase.ImportAsset(controllerPath, ImportAssetOptions.ForceUpdate);
+            EditorUtility.SetDirty(controller);
             UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
 
-            return controller;
+            return ModularAvatarMergeAnimatorUtility.ReloadControllerAtPath(controllerPath);
         }
 
         private static AnimatorControllerLayer CreateParameterSmoothingLayer(
@@ -201,20 +295,23 @@ namespace Samirin33.NDMF.Components.Editor
             clip.frameRate = WeightFixSampleRate;
 
             var keyframeCount = WeightFixFrameEnd - WeightFixFrameStart + 1;
+            var processedFixedWeightParams = new HashSet<string>(StringComparer.Ordinal);
 
             foreach (var info in infos)
             {
-                var paramName = info.parameterName;
-                var fixedWeightParamName = $"{paramName}_FixedSmoothWeight";
-                var inputWeight = info.smoothWeight * 0.01f;
-                var targetWeight = inputWeight * inputWeight;
+                var fixedWeightParamName = GetFixedWeightParamName(info.smoothWeight);
+                if (!processedFixedWeightParams.Add(fixedWeightParamName))
+                    continue;
+
+                var inputWeight = Mathf.Max(info.smoothWeight, 0.01f) * 0.01f;
+                var targetWeight = Mathf.Max(inputWeight * inputWeight, 0.0001f);
 
                 var keyframes = new Keyframe[keyframeCount];
                 for (int i = 0; i < keyframeCount; i++)
                 {
                     int frameIndex = WeightFixFrameStart + i;
                     float time = frameIndex / (float)WeightFixSampleRate;
-                    float value = 2 - Mathf.Pow(1f / targetWeight, 1f / frameIndex);
+                    float value = 2f - Mathf.Pow(1f / targetWeight, 1f / frameIndex);
                     keyframes[i] = new Keyframe(time, value);
                 }
 
@@ -248,8 +345,8 @@ namespace Samirin33.NDMF.Components.Editor
             AnimatorController controller)
         {
             var paramName = info.parameterName;
-            var smoothedParamName = $"{paramName}_Smoothed";
-            var fixedWeightParamName = $"{paramName}_FixedSmoothWeight";
+            var smoothedParamName = GetSmoothedParamName(info);
+            var fixedWeightParamName = GetFixedWeightParamName(info.smoothWeight);
 
             var clip0 = CreateEmbeddedParamClip(smoothedParamName, 0f, controller);
             var clip1 = CreateEmbeddedParamClip(smoothedParamName, 1f, controller);
@@ -351,15 +448,48 @@ namespace Samirin33.NDMF.Components.Editor
             return clip;
         }
 
-        private static void AddModularAvatarModule(GameObject avatarRootObject, AnimatorController controller,
-            List<(string name, ParameterSyncType syncType)> paramNamesToRegister)
+        private static void AddModularAvatarModule(GameObject parentObject, AnimatorController controller,
+            List<(string name, ParameterSyncType syncType)> paramNamesToRegister, string moduleObjectName)
         {
-            var mergeAnimator = avatarRootObject.AddComponent<ModularAvatarMergeAnimator>();
+            var moduleRoot = ModularAvatarMergeAnimatorUtility.RegisterMergeAnimatorModule(
+                parentObject,
+                moduleObjectName,
+                controller,
+                layerPriority: 0,
+                matchAvatarWriteDefaults: false);
+            if (moduleRoot == null)
+            {
+                Debug.LogError("[ParameterSmoothing] MA Merge Animator の登録に失敗しました。Animator Controller の参照を確認してください。");
+                return;
+            }
 
-            mergeAnimator.animator = controller;
-            mergeAnimator.layerPriority = 0;
+            if (paramNamesToRegister == null || paramNamesToRegister.Count == 0)
+                return;
 
-            EditorUtility.SetDirty(avatarRootObject);
+            var maParameters = moduleRoot.GetComponent<ModularAvatarParameters>();
+            if (maParameters == null)
+                maParameters = moduleRoot.AddComponent<ModularAvatarParameters>();
+
+            foreach (var (paramName, syncType) in paramNamesToRegister)
+            {
+                if (maParameters.parameters.Exists(p => p.nameOrPrefix == paramName))
+                    continue;
+
+                maParameters.parameters.Add(new ParameterConfig
+                {
+                    nameOrPrefix = paramName,
+                    remapTo = "",
+                    internalParameter = false,
+                    isPrefix = false,
+                    syncType = syncType,
+                    localOnly = true,
+                    defaultValue = 0f,
+                    saved = false,
+                    hasExplicitDefaultValue = true
+                });
+            }
+
+            EditorUtility.SetDirty(moduleRoot);
         }
     }
 }

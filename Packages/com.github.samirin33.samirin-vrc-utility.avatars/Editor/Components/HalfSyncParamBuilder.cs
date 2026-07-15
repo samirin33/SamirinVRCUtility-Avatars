@@ -40,16 +40,17 @@ namespace Samirin33.NDMF.Components.Editor
             if (controller == null)
                 return;
 
-            AddModularAvatarModule(avatarRootObject, controller, paramNamesToRegister);
+            var moduleParent = halfSyncParams.FirstOrDefault(c => c != null)?.gameObject ?? avatarRootObject;
+            AddModularAvatarModule(moduleParent, controller, paramNamesToRegister);
 
             var smoothingInfos = ExtractFloatSmoothingInfos(halfSyncParams);
             if (smoothingInfos.Count > 0)
             {
-                ParameterSmoothingBuilder.BuildFromInfos(avatarRootObject, smoothingInfos.ToArray());
+                ParameterSmoothingBuilder.BuildFromHalfSyncParam(avatarRootObject, smoothingInfos.ToArray(), moduleParent);
                 foreach (var component in halfSyncParams)
                 {
                     if (component == null || !HasFloatSettings(component)) continue;
-                    ParameterSmoothing.EnsureFPSCounterModule(component.gameObject);
+                    ParameterSmoothingBuilder.EnsureFPSCounterModule(component.gameObject);
                 }
             }
         }
@@ -81,8 +82,10 @@ namespace Samirin33.NDMF.Components.Editor
 
                     infos.Add(new ParameterSmoothing.ParameterSmoothingInfo
                     {
-                        parameterName = paramName,
-                        smoothWeight = setting.smoothWeight
+                        parameterName = $"{paramName}_Snapped",
+                        useDefaultSmoothWeight = false,
+                        smoothWeight = setting.smoothWeight,
+                        smoothedParameterName = $"{paramName}_Smoothed"
                     });
                 }
             }
@@ -241,7 +244,7 @@ namespace Samirin33.NDMF.Components.Editor
             foreach (var (layer, _, _, _, _, _) in layersToAdd)
                 controller.AddLayer(layer);
 
-            RegisterControllerHierarchy(controller);
+            AnimatorControllerAssetUtility.RegisterControllerHierarchy(controller);
 
             foreach (var (_, _, intParamName, bitCount, maxValue, _) in layersToAdd)
                 AddParamDriverBehaviours(controller, intParamName, bitCount, maxValue, paramDriverType);
@@ -249,67 +252,16 @@ namespace Samirin33.NDMF.Components.Editor
             AddRangeConvertParamDrivers(controller, settings, paramDriverType);
 
             EditorUtility.SetDirty(controller);
-            AssetDatabase.SaveAssets();
-
-            AssetDatabase.ImportAsset(controllerPath, ImportAssetOptions.ForceUpdate);
             UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
 
-            return controller;
+            return ModularAvatarMergeAnimatorUtility.ReloadControllerAtPath(controllerPath);
         }
 
         /// <summary>
         /// State がコントローラーのサブアセットのとき、AddStateMachineBehaviour は Behaviour を自動登録するため二重登録を避ける。
         /// </summary>
         private static void EnsureSubAsset(UnityEngine.Object obj, UnityEngine.Object mainAsset)
-        {
-            if (obj == null || mainAsset == null) return;
-            var mainPath = AssetDatabase.GetAssetPath(mainAsset);
-            if (string.IsNullOrEmpty(mainPath)) return;
-            if (AssetDatabase.GetAssetPath(obj) == mainPath)
-                return;
-            AssetDatabase.AddObjectToAsset(obj, mainAsset);
-        }
-
-        private static void RegisterControllerHierarchy(AnimatorController controller)
-        {
-            if (controller == null) return;
-            foreach (var layer in controller.layers)
-            {
-                if (layer.stateMachine != null)
-                    RegisterStateMachineHierarchy(layer.stateMachine, controller);
-            }
-        }
-
-        private static void RegisterStateMachineHierarchy(AnimatorStateMachine stateMachine, AnimatorController controller)
-        {
-            if (stateMachine == null || controller == null) return;
-
-            EnsureSubAsset(stateMachine, controller);
-
-            foreach (var transition in stateMachine.anyStateTransitions)
-                EnsureSubAsset(transition, controller);
-
-            foreach (var transition in stateMachine.entryTransitions)
-                EnsureSubAsset(transition, controller);
-
-            foreach (var childState in stateMachine.states)
-            {
-                if (childState.state == null) continue;
-                EnsureSubAsset(childState.state, controller);
-                foreach (var transition in childState.state.transitions)
-                    EnsureSubAsset(transition, controller);
-            }
-
-            foreach (var childMachine in stateMachine.stateMachines)
-            {
-                if (childMachine.stateMachine == null) continue;
-                foreach (var transition in stateMachine.GetStateMachineTransitions(childMachine.stateMachine))
-                    EnsureSubAsset(transition, controller);
-                RegisterStateMachineHierarchy(childMachine.stateMachine, controller);
-            }
-
-            EditorUtility.SetDirty(stateMachine);
-        }
+            => AnimatorControllerAssetUtility.EnsureSubAsset(obj, mainAsset);
 
         private static AnimatorControllerLayer CreateLayerForParam(string paramName, int bitCount, int maxValue,
             AnimationClip emptyMotion, bool writeDefault)
@@ -736,17 +688,21 @@ namespace Samirin33.NDMF.Components.Editor
             return typeof(VRCAvatarParameterDriver);
         }
 
-        private static void AddModularAvatarModule(GameObject componentObject, AnimatorController controller,
+        private static void AddModularAvatarModule(GameObject parentObject, AnimatorController controller,
             List<(string name, ParameterSyncType syncType)> paramNamesToRegister)
         {
-            var mergeAnimator = componentObject.AddComponent<ModularAvatarMergeAnimator>();
+            var moduleRoot = ModularAvatarMergeAnimatorUtility.RegisterMergeAnimatorModule(
+                parentObject,
+                "HalfSyncParam_Module",
+                controller,
+                layerPriority: 0,
+                matchAvatarWriteDefaults: false);
+            if (moduleRoot == null)
+                return;
 
-            mergeAnimator.animator = controller;
-            mergeAnimator.layerPriority = 0;
-
-            var maParameters = componentObject.GetComponent<ModularAvatarParameters>();
+            var maParameters = moduleRoot.GetComponent<ModularAvatarParameters>();
             if (maParameters == null)
-                maParameters = componentObject.AddComponent<ModularAvatarParameters>();
+                maParameters = moduleRoot.AddComponent<ModularAvatarParameters>();
 
             foreach (var (paramName, syncType) in paramNamesToRegister)
             {
@@ -767,7 +723,7 @@ namespace Samirin33.NDMF.Components.Editor
                 });
             }
 
-            EditorUtility.SetDirty(componentObject);
+            EditorUtility.SetDirty(moduleRoot);
         }
     }
 }
