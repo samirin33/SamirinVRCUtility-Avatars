@@ -3,7 +3,9 @@
     "rootNamespace": "",
     "references": [
         "VRC.SDKBase",
-        "nadena.dev.ndmf.runtime"
+        "VRC.SDK3A",
+        "nadena.dev.ndmf.runtime",
+        "nadena.dev.modular-avatar.core"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
